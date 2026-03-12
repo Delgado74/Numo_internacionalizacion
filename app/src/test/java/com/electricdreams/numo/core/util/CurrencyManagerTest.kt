@@ -102,12 +102,15 @@ class CurrencyManagerTest {
     }
     
     @Test
-    fun `getCoinbaseApiUrl returns correct URL`() {
+    fun `getPriceApiUrl returns correct URL`() {
         currencyManager.setPreferredCurrency("EUR")
-        assertEquals("https://api.coinbase.com/v2/prices/BTC-EUR/spot", currencyManager.getCoinbaseApiUrl())
-        
+        assertEquals("https://api.coinbase.com/v2/prices/BTC-EUR/spot", currencyManager.getPriceApiUrl())
+
         currencyManager.setPreferredCurrency("USD")
-        assertEquals("https://api.coinbase.com/v2/prices/BTC-USD/spot", currencyManager.getCoinbaseApiUrl())
+        assertEquals("https://api.coinbase.com/v2/prices/BTC-USD/spot", currencyManager.getPriceApiUrl())
+
+        currencyManager.setPreferredCurrency("KRW")
+        assertEquals("https://api.upbit.com/v1/ticker?markets=KRW-BTC", currencyManager.getPriceApiUrl())
     }
 
     @Test
@@ -130,14 +133,39 @@ class CurrencyManagerTest {
     }
 
     @Test
-    fun `getCoinbaseApiUrl returns correct URL for Nordic currencies`() {
+    fun `getPriceApiUrl returns correct URL for Nordic currencies`() {
         currencyManager.setPreferredCurrency("DKK")
-        assertEquals("https://api.coinbase.com/v2/prices/BTC-DKK/spot", currencyManager.getCoinbaseApiUrl())
+        assertEquals("https://api.coinbase.com/v2/prices/BTC-DKK/spot", currencyManager.getPriceApiUrl())
 
         currencyManager.setPreferredCurrency("SEK")
-        assertEquals("https://api.coinbase.com/v2/prices/BTC-SEK/spot", currencyManager.getCoinbaseApiUrl())
+        assertEquals("https://api.coinbase.com/v2/prices/BTC-SEK/spot", currencyManager.getPriceApiUrl())
 
         currencyManager.setPreferredCurrency("NOK")
-        assertEquals("https://api.coinbase.com/v2/prices/BTC-NOK/spot", currencyManager.getCoinbaseApiUrl())
+        assertEquals("https://api.coinbase.com/v2/prices/BTC-NOK/spot", currencyManager.getPriceApiUrl())
+    }
+
+    @Test
+    fun `isValidCurrency supports KRW`() {
+        assertTrue(currencyManager.isValidCurrency("KRW"))
+    }
+
+    @Test
+    fun `getCurrentSymbol returns correct symbol for KRW`() {
+        currencyManager.setPreferredCurrency("KRW")
+        assertEquals("₩", currencyManager.getCurrentSymbol())
+    }
+
+    @Test
+    fun `parsePriceResponse parses Upbit response for KRW`() {
+        currencyManager.setPreferredCurrency("KRW")
+        val upbitResponse = """[{"trade_price":136500000.0}]"""
+        assertEquals(136500000.0, currencyManager.parsePriceResponse(upbitResponse), 0.01)
+    }
+
+    @Test
+    fun `parsePriceResponse parses Coinbase response for USD`() {
+        currencyManager.setPreferredCurrency("USD")
+        val coinbaseResponse = """{"data":{"amount":97500.50}}"""
+        assertEquals(97500.50, currencyManager.parsePriceResponse(coinbaseResponse), 0.01)
     }
 }
