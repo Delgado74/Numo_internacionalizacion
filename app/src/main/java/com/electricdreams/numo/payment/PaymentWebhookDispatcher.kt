@@ -213,11 +213,60 @@ class PaymentWebhookDispatcher(
             )
         }
 
+    suspend fun dispatchBulkPaymentsNow(entries: List<PaymentHistoryEntry>): DispatchResult =
+        withContext(ioDispatcher) {
+            val endpoints = endpointProvider.invoke()
+            if (endpoints.isEmpty()) {
+                return@withContext DispatchResult(0, 0, 0)
+            }
+
+            val now = System.currentTimeMillis()
+            val terminal = TerminalMeta(
+                platform = "android",
+                appPackage = appContext.packageName,
+                appVersionName = BuildConfig.VERSION_NAME,
+                appVersionCode = BuildConfig.VERSION_CODE,
+            )
+
+            val payloads = entries.map { entry ->
+                val event = toPaymentReceivedEvent(entry)
+                WebhookPayload(
+                    event = EVENT_PAYMENT_RECEIVED,
+                    payloadVersion = PAYLOAD_VERSION,
+                    eventId = UUID.randomUUID().toString(),
+                    timestampMs = now,
+                    timestampIso = formatIsoTimestamp(now),
+                    payment = event.payment,
+                    transaction = event.transaction,
+                    checkout = event.checkout,
+                    terminal = terminal,
+                )
+            }
+
+            val payloadJson = gson.toJson(payloads)
+            val eventId = UUID.randomUUID().toString()
+            var successCount = 0
+
+            endpoints.forEach { endpoint ->
+                if (postWithRetry(endpoint, payloadJson, eventId)) {
+                    successCount += 1
+                }
+            }
+
+            DispatchResult(
+                totalEndpoints = endpoints.size,
+                successCount = successCount,
+                failureCount = endpoints.size - successCount,
+            )
+        }
+
     private suspend fun postWithRetry(
         endpoint: WebhookSettingsManager.WebhookEndpointConfig,
         jsonBody: String,
         eventId: String,
     ): Boolean {
+        Log.d(TAG, "Dispatching webhook to url=${endpoint.url} with payload: $jsonBody")
+        
         retryDelaysMs.forEachIndexed { attemptIndex, delayMs ->
             if (delayMs > 0) {
                 delay(delayMs)

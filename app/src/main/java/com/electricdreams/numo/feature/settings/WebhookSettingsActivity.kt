@@ -8,18 +8,32 @@ import android.view.View
 import android.widget.EditText
 import android.widget.ImageButton
 import android.widget.LinearLayout
+import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import com.electricdreams.numo.R
 import com.electricdreams.numo.core.util.WebhookSettingsManager
+import com.electricdreams.numo.feature.history.PaymentsHistoryActivity
 import com.electricdreams.numo.feature.scanner.QRScannerActivity
+import com.electricdreams.numo.payment.PaymentWebhookDispatcher
 import com.electricdreams.numo.ui.util.DialogHelper
 import com.google.gson.Gson
 import com.google.gson.JsonSyntaxException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import android.widget.ImageView
+import java.util.concurrent.TimeUnit
 
 /**
  * Settings screen for configuring payment-received webhooks.
@@ -31,6 +45,14 @@ class WebhookSettingsActivity : AppCompatActivity() {
     private lateinit var emptyStateText: TextView
     private lateinit var qrScannerLauncher: ActivityResultLauncher<Intent>
     private var currentDialog: AlertDialog? = null
+    private var isSyncing: Boolean = false
+    private var syncJob: Job? = null
+
+    private val pingClient: OkHttpClient by lazy {
+        OkHttpClient.Builder()
+            .callTimeout(5, TimeUnit.SECONDS)
+            .build()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -51,6 +73,7 @@ class WebhookSettingsActivity : AppCompatActivity() {
 
         findViewById<ImageButton>(R.id.back_button).setOnClickListener { finish() }
         findViewById<View>(R.id.add_endpoint_button).setOnClickListener { showAddEndpointDialog() }
+        findViewById<View>(R.id.sync_all_button).setOnClickListener { syncAllTransactions() }
 
         endpointsList = findViewById(R.id.endpoints_list)
         emptyStateText = findViewById(R.id.empty_state_text)
@@ -69,6 +92,7 @@ class WebhookSettingsActivity : AppCompatActivity() {
             val item = inflater.inflate(R.layout.item_webhook_endpoint, endpointsList, false)
             val endpointText = item.findViewById<TextView>(R.id.endpoint_url_text)
             val authStatusText = item.findViewById<TextView>(R.id.endpoint_auth_status_text)
+            val statusDot = item.findViewById<ImageView>(R.id.endpoint_status_dot)
             val editAuthButton = item.findViewById<ImageButton>(R.id.edit_auth_button)
             val deleteButton = item.findViewById<ImageButton>(R.id.delete_button)
 
@@ -77,6 +101,34 @@ class WebhookSettingsActivity : AppCompatActivity() {
                 getString(R.string.webhook_settings_auth_set)
             } else {
                 getString(R.string.webhook_settings_auth_not_set)
+            }
+
+            statusDot.setImageResource(R.drawable.bg_status_dot_gray)
+            lifecycleScope.launch(Dispatchers.IO) {
+                var isReachable = false
+                try {
+                    val healthUrl = java.net.URL(java.net.URL(endpoint.url), "/api/health").toString()
+                    val request = Request.Builder()
+                        .url(healthUrl)
+                        .get()
+                        .build()
+                    pingClient.newCall(request).execute().use { response ->
+                        if (response.isSuccessful) {
+                            val bodyStr = response.body?.string()
+                            isReachable = bodyStr?.contains("\"ok\":true") == true || bodyStr?.contains("\"ok\": true") == true
+                        }
+                    }
+                } catch (e: Exception) {
+                    isReachable = false
+                }
+
+                withContext(Dispatchers.Main) {
+                    if (isReachable) {
+                        statusDot.setImageResource(R.drawable.bg_status_dot_green)
+                    } else {
+                        statusDot.setImageResource(R.drawable.bg_status_dot_red)
+                    }
+                }
             }
 
             item.setOnClickListener {
@@ -110,6 +162,93 @@ class WebhookSettingsActivity : AppCompatActivity() {
             setBackgroundColor(resources.getColor(R.color.color_divider, theme))
         }
         container.addView(divider)
+    }
+
+    private fun syncAllTransactions() {
+        if (isSyncing) return
+        
+        if (webhookSettingsManager.getEndpoints().isEmpty()) {
+            Toast.makeText(this, R.string.webhook_settings_empty, Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        isSyncing = true
+        val syncButton = findViewById<View>(R.id.sync_all_button)
+        syncButton.alpha = 0.5f
+
+        val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_sync_progress, null)
+        val progressBar = dialogView.findViewById<ProgressBar>(R.id.sync_progress_bar)
+        val progressMessage = dialogView.findViewById<TextView>(R.id.sync_progress_message)
+        
+        progressBar.isIndeterminate = true
+        progressMessage.text = getString(R.string.webhook_settings_syncing_progress, 0, 0)
+        
+        val progressDialog = AlertDialog.Builder(this)
+            .setView(dialogView)
+            .setCancelable(false)
+            .setNegativeButton(R.string.common_cancel) { _, _ ->
+                syncJob?.cancel()
+                isSyncing = false
+                syncButton.alpha = 1.0f
+                Toast.makeText(this, R.string.webhook_settings_sync_cancelled, Toast.LENGTH_SHORT).show()
+            }
+            .create()
+            
+        progressDialog.show()
+
+        syncJob = lifecycleScope.launch {
+            try {
+                val history = withContext(Dispatchers.IO) {
+                    PaymentsHistoryActivity.getPaymentHistory(this@WebhookSettingsActivity)
+                }
+
+                val completedTransactions = history.filter { it.isCompleted() }
+
+                if (completedTransactions.isEmpty()) {
+                    progressDialog.dismiss()
+                    Toast.makeText(
+                        this@WebhookSettingsActivity,
+                        R.string.webhook_settings_sync_all_empty,
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    return@launch
+                }
+                
+                progressMessage.text = getString(
+                    R.string.webhook_settings_syncing_progress, 
+                    completedTransactions.size, 
+                    completedTransactions.size
+                )
+                progressBar.isIndeterminate = false
+                progressBar.max = completedTransactions.size
+                progressBar.progress = completedTransactions.size
+
+                var successCount = 0
+                val dispatcher = PaymentWebhookDispatcher.getInstance(this@WebhookSettingsActivity)
+
+                val result = dispatcher.dispatchBulkPaymentsNow(completedTransactions)
+                successCount = result.successCount
+
+                progressDialog.dismiss()
+                Toast.makeText(
+                    this@WebhookSettingsActivity,
+                    getString(R.string.webhook_settings_sync_all_success, successCount),
+                    Toast.LENGTH_SHORT
+                ).show()
+            } catch (e: Exception) {
+                android.util.Log.e(TAG, "Error during bulk sync: ${e.message}", e)
+                progressDialog.dismiss()
+                Toast.makeText(
+                    this@WebhookSettingsActivity,
+                    "Sync failed: ${e.message}",
+                    Toast.LENGTH_LONG
+                ).show()
+            } finally {
+                isSyncing = false
+                syncButton.alpha = 1.0f
+                syncJob = null
+            }
+        }
     }
 
     private fun handleScannedQr(qrValue: String) {
@@ -359,5 +498,9 @@ class WebhookSettingsActivity : AppCompatActivity() {
                 },
             ),
         )
+    }
+
+    companion object {
+        private const val TAG = "WebhookSettingsActivity"
     }
 }
