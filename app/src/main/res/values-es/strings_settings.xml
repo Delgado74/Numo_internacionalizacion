@@ -98,62 +98,8 @@
     <string name="about_contact_us">Contacto</string>
 
     <!-- Términos de Servicio -->
-    <string name="terms_of_service_full">NUMO WALLET - TÉRMINOS DE SERVICIO
-
-1. ACEPTACIÓN
-Al usar esta aplicación de cartera, aceptas estos términos.
-
-2. NATURALEZA DEL SERVICIO
-Esta es una cartera de Bitcoin autocustodiada usando tecnología Cashu ecash. Eres el único responsable de tus fondos y frase semilla.
-
-3. FRASE SEMILLA
-Tu frase semilla de 12 palabras es la ÚNICA forma de recuperar tu cartera. Nunca la compartas. Almacénala de forma segura sin conexión. No podemos recuperar frases semilla perdidas.
-
-4. SIN GARANTÍA
-Este software se proporciona "tal cual" sin garantía de ningún tipo. Úsalo bajo tu propio riesgo.
-
-5. LIMITACIÓN DE RESPONSABILIDAD
-No somos responsables de ninguna pérdida de fondos, ya sea por errores de software, errores del usuario o fallos de mints de terceros.
-
-6. MINTS ECASH
-Los tokens ecash son mantenidos por mints de terceros. Estos mints pueden fallar o no estar disponibles. Diversifica entre varios mints.
-
-7. PRIVACIDAD
-Esta cartera no recopila datos personales. Las transacciones se procesan a través de mints ecash que pueden tener sus propias políticas de privacidad.
-
-8. ACTUALIZACIONES
-Estos términos pueden actualizarse. El uso continuo constituye la aceptación.
-
-Última actualización: Noviembre 2024</string>
+    <string name="terms_of_service_full">NUMO WALLET - TÉRMINOS DE SERVICIO\n\n1. ACEPTACIÓN\nAl usar esta aplicación de cartera, aceptas estos términos.\n\n2. NATURALEZA DEL SERVICIO\nEsta es una cartera de Bitcoin autocustodiada usando tecnología Cashu ecash. Eres el único responsable de tus fondos y frase semilla.\n\n3. FRASE SEMILLA\nTu frase semilla de 12 palabras es la ÚNICA forma de recuperar tu cartera. Nunca la compartas. Almacénala de forma segura sin conexión. No podemos recuperar frases semilla perdidas.\n\n4. SIN GARANTÍA\nEste software se proporciona "tal cual" sin garantía de ningún tipo. Úsalo bajo tu propio riesgo.\n\n5. LIMITACIÓN DE RESPONSABILIDAD\nNo somos responsables de ninguna pérdida de fondos, ya sea por errores de software, errores del usuario o fallos de mints de terceros.\n\n6. MINTS ECASH\nLos tokens ecash son mantenidos por mints de terceros. Estos mints pueden fallar o no estar disponibles. Diversifica entre varios mints.\n\n7. PRIVACIDAD\nEsta cartera no recopila datos personales. Las transacciones se procesan a través de mints ecash que pueden tener sus propias políticas de privacidad.\n\n8. ACTUALIZACIONES\nEstos términos pueden actualizarse. El uso continuo constituye la aceptación.\n\nÚltima actualización: Noviembre 2024</string>
 
     <!-- Política de Privacidad -->
-    <string name="privacy_policy_full">NUMO WALLET - POLÍTICA DE PRIVACIDAD
-
-1. RECOPILACIÓN DE DATOS
-Numo no recopila, almacena ni transmite ningún dato personal. La aplicación se ejecuta completamente en tu dispositivo.
-
-2. DATOS DE LA CARTERA
-Tu frase semilla y los datos de tu cartera se almacenan localmente en tu dispositivo. No tenemos acceso a esta información.
-
-3. COMUNICACIONES DE RED
-La aplicación se comunica con:
-• Mints de Cashu (para gestionar tokens ecash)
-• APIs de precios (para obtener tipos de cambio)
-• Relés de Nostr (para funciones opcionales de respaldo)
-
-Estos servicios pueden tener sus propias políticas de privacidad.
-
-4. ANALÍTICA
-No usamos ningún servicio de análisis o seguimiento.
-
-5. MINTS DE TERCEROS
-Al usar mints ecash, el operador del mint puede ver los montos y tiempos de las transacciones. Elige mints de confianza.
-
-6. RESPALDO
-Si habilitas el respaldo de Nostr, los datos encriptados de la cartera se publican en relés de Nostr. Solo tú puedes desencriptar estos datos con tu frase semilla.
-
-7. CONTACTO
-Para preguntas de privacidad: numopay@proton.me
-
-Última actualización: Noviembre 2024</string>
+    <string name="privacy_policy_full">NUMO WALLET - POLÍTICA DE PRIVACIDAD\n\n1. RECOPILACIÓN DE DATOS\nNumo no recopila, almacena ni transmite ningún dato personal. La aplicación se ejecuta completamente en tu dispositivo.\n\n2. DATOS DE LA CARTERA\nTu frase semilla y los datos de tu cartera se almacenan localmente en tu dispositivo. No tenemos acceso a esta información.\n\n3. COMUNICACIONES DE RED\nLa aplicación se comunica con:\n• Mints de Cashu (para gestionar tokens ecash)\n• APIs de precios (para obtener tipos de cambio)\n• Relés de Nostr (para funciones opcionales de respaldo)\n\nEstos servicios pueden tener sus propias políticas de privacidad.\n\n4. ANALÍTICA\nNo usamos ningún servicio de análisis o seguimiento.\n\n5. MINTS DE TERCEROS\nAl usar mints ecash, el operador del mint puede ver los montos y tiempos de las transacciones. Elige mints de confianza.\n\n6. RESPALDO\nSi habilitas el respaldo de Nostr, los datos encriptados de la cartera se publican en relés de Nostr. Solo tú puedes desencriptar estos datos con tu frase semilla.\n\n7. CONTACTO\nPara preguntas de privacidad: numopay@proton.me\n\nÚltima actualización: Noviembre 2024</string>
 </resources>
