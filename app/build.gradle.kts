@@ -7,12 +7,12 @@ plugins {
 
 android {
     namespace = "com.electricdreams.numo"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.electricdreams.numo"
         minSdk = 24
-        targetSdk = 34
+        targetSdk = 35
         versionCode = 5
         versionName = "1.4"
 
@@ -103,7 +103,7 @@ dependencies {
     // Testing
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.mockito:mockito-core:5.12.0")
-    testImplementation("org.robolectric:robolectric:4.11.1")
+    testImplementation("org.robolectric:robolectric:4.14.1")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
     testImplementation("net.bytebuddy:byte-buddy:1.14.12")
     testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
