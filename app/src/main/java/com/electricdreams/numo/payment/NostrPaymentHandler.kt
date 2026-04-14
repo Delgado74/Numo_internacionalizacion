@@ -1,6 +1,7 @@
 package com.electricdreams.numo.payment
 
 import android.content.Context
+import com.electricdreams.numo.R
 import android.util.Log
 import com.electricdreams.numo.feature.history.PaymentsHistoryActivity
 import com.electricdreams.numo.core.util.MintManager
@@ -32,6 +33,9 @@ class NostrPaymentHandler(
         /** Called when a Cashu token is received via Nostr */
         fun onTokenReceived(token: String)
         
+        /** Called when a payment attempt fails */
+        fun onPaymentFailure(message: String)
+        
         /** Called when an error occurs */
         fun onError(message: String)
     }
@@ -49,6 +53,10 @@ class NostrPaymentHandler(
 
     /** The generated payment request string */
     var paymentRequest: String? = null
+        private set
+
+    /** The generated payment request string (bech32) */
+    var paymentRequestBech32: String? = null
         private set
 
     /**
@@ -136,7 +144,7 @@ class NostrPaymentHandler(
         // Create payment request with Nostr transport
         val request = CashuPaymentHelper.createPaymentRequestWithNostr(
             paymentAmount,
-            "Payment of $paymentAmount sats",
+            context.getString(R.string.payment_request_default_description, paymentAmount),
             mintsForPaymentRequest,
             profile
         )
@@ -147,9 +155,10 @@ class NostrPaymentHandler(
             return
         }
 
-        paymentRequest = request
-        Log.d(TAG, "Created payment request with Nostr: $request")
-        callback.onPaymentRequestReady(request)
+        paymentRequest = request.original
+        paymentRequestBech32 = request.bech32
+        Log.d(TAG, "Created payment request with Nostr: ${request.original}")
+        callback.onPaymentRequestReady(request.original)
 
         // Stop any existing listener
         listener?.stop()
@@ -162,10 +171,43 @@ class NostrPaymentHandler(
             allowedMints,
             relayList,
             { token -> callback.onTokenReceived(token) },
-            { msg, t -> Log.e(TAG, "NostrPaymentListener error: $msg", t) }
+            object : NostrPaymentListener.ErrorHandler {
+                override fun onPaymentFailure(message: String, t: Throwable?) {
+                    Log.e(TAG, "NostrPaymentListener payment failure: $message", t)
+                    callback.onPaymentFailure(message ?: t?.message ?: "Unknown Nostr payment failure")
+                }
+            }
         ).also { it.start() }
 
         Log.d(TAG, "Nostr payment listener started")
+    }
+
+    /**
+     * Atomically rotates the Nostr identity keys for a pending payment so that
+     * if the payment fails and is retried, the paying wallet won't hit the
+     * same rejected event again.
+     * 
+     * @param pendingPaymentId The pending payment ID to update
+     */
+    fun rotateKeys(pendingPaymentId: String?) {
+        if (pendingPaymentId == null) return
+        
+        Log.d(TAG, "Rotating nostr keys for pending payment id=$pendingPaymentId")
+        // Generate new ephemeral keys
+        val eph = NostrKeyPair.generate()
+        keyPair = eph
+        
+        val profile = Nip19.encodeNprofile(eph.publicKeyBytes, NOSTR_RELAYS.toList())
+        nprofile = profile
+        secretHex = eph.hexSec
+
+        // Update the database immediately
+        PaymentsHistoryActivity.updatePendingWithNostrInfo(
+            context = context,
+            paymentId = pendingPaymentId,
+            nostrSecretHex = eph.hexSec,
+            nostrNprofile = profile,
+        )
     }
 
     /**

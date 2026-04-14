@@ -7,14 +7,14 @@ plugins {
 
 android {
     namespace = "com.electricdreams.numo"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.electricdreams.numo"
         minSdk = 24
-        targetSdk = 34
-        versionCode = 3
-        versionName = "1.2"
+        targetSdk = 35
+        versionCode = 7
+        versionName = "1.4"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -59,6 +59,7 @@ android {
         // avoid version coupling between Compose compiler and Kotlin.
         compose = false
         viewBinding = true
+        buildConfig = true
     }
 
     packaging {
@@ -95,13 +96,14 @@ dependencies {
     implementation("com.google.android.material:material:1.11.0")
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
     implementation("androidx.gridlayout:gridlayout:1.0.0")
+    implementation("androidx.viewpager2:viewpager2:1.0.0")
     implementation("androidx.navigation:navigation-fragment-ktx:2.7.6")
     implementation("androidx.navigation:navigation-ui-ktx:2.7.6")
     
     // Testing
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.mockito:mockito-core:5.12.0")
-    testImplementation("org.robolectric:robolectric:4.11.1")
+    testImplementation("org.robolectric:robolectric:4.14.1")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
     testImplementation("net.bytebuddy:byte-buddy:1.14.12")
     testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
@@ -116,7 +118,7 @@ dependencies {
 
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
-    implementation(files("libs/cashu-java-sdk-1.0-SNAPSHOT.jar"))
+    // implementation(files("libs/cashu-java-sdk-1.0-SNAPSHOT.jar"))
 
     // Jackson for JSON and CBOR processing
     implementation("com.fasterxml.jackson.core:jackson-databind:2.16.1")
@@ -134,7 +136,7 @@ dependencies {
     implementation("com.google.zxing:core:3.5.3")
 
     // CDK Kotlin bindings
-    implementation("org.cashudevkit:cdk-kotlin:0.15.1")
+    implementation("org.cashudevkit:cdk-kotlin:0.16.0")
     
     // ML Kit Barcode Scanning
     implementation("com.google.mlkit:barcode-scanning:17.3.0")

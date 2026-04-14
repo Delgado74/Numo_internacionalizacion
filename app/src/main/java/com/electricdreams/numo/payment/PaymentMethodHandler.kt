@@ -2,6 +2,7 @@ package com.electricdreams.numo.payment
 
 import android.content.Context
 import android.content.Intent
+import com.electricdreams.numo.util.startActivityForResultCompat
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.electricdreams.numo.PaymentRequestActivity
@@ -25,7 +26,7 @@ class PaymentMethodHandler(
         
         val routing = PaymentRoutingCore.determinePaymentRoute(tipsManager.tipsEnabled)
         val intent = routing.buildIntent(activity, amount, formattedAmount, checkoutBasketJson)
-        activity.startActivityForResult(intent, REQUEST_CODE_PAYMENT)
+        activity.startActivityForResultCompat(intent, REQUEST_CODE_PAYMENT)
     }
 
     /** Proceed with NDEF payment (HCE) - preserved but not currently invoked in main flow */
@@ -45,7 +46,7 @@ class PaymentMethodHandler(
         val mintsForPaymentRequest =
             if (mintManager.isSwapFromUnknownMintsEnabled()) null else allowedMints
 
-        val paymentRequest = CashuPaymentHelper.createPaymentRequest(amount, "Payment of $amount sats", mintsForPaymentRequest)
+        val paymentRequest = CashuPaymentHelper.createPaymentRequest(amount, "Payment of $amount sats", mintsForPaymentRequest)?.original
             ?: run {
                 Toast.makeText(activity, R.string.payment_toast_failed_create_request, Toast.LENGTH_SHORT).show()
                 return
@@ -101,9 +102,9 @@ class PaymentMethodHandler(
                     }
                 }
 
-                override fun onNfcReadingStopped() {
+                override fun onNfcReadingStopped(failedInMiddleOfTransaction: Boolean) {
                     activity.runOnUiThread {
-                        onStatusUpdate("NFC reading stopped")
+                        onStatusUpdate(if (failedInMiddleOfTransaction) "NFC reading interrupted" else "NFC reading stopped")
                     }
                 }
             })

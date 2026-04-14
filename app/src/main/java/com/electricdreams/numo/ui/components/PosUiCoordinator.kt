@@ -4,12 +4,18 @@ import android.content.Intent
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import android.os.Vibrator
+import com.electricdreams.numo.util.getVibrator
+import com.electricdreams.numo.util.vibrateCompat
 import android.view.View
 import android.widget.Button
 import android.widget.GridLayout
 import android.widget.ImageButton
 import android.widget.ProgressBar
 import android.widget.TextView
+import androidx.lifecycle.lifecycleScope
+import com.electricdreams.numo.core.cashu.CashuWalletManager
+import kotlinx.coroutines.launch
 import androidx.appcompat.app.AppCompatActivity
 import androidx.constraintlayout.widget.ConstraintLayout
 import com.electricdreams.numo.R
@@ -59,6 +65,30 @@ class PosUiCoordinator(
         initializeViews()
         initializeManagers()
         setupNavigationButtons()
+        
+        // Disable charge button initially, enable when wallet is ready
+        submitButton.isEnabled = false
+        submitButton.alpha = 0.5f
+        
+        if (true) {
+            activity.lifecycleScope.launch {
+                CashuWalletManager.walletState.collect { state ->
+                    val isReady = state == com.electricdreams.numo.core.cashu.WalletState.READY
+                    // Make sure we only enable it if we don't have a spinner shown
+                    if (submitButtonSpinner.visibility != android.view.View.VISIBLE) {
+                        submitButton.isEnabled = isReady
+                        submitButton.alpha = if (isReady) 1.0f else 0.5f
+                        
+                        // Rely on AmountDisplayManager to set correct text/state based on amount and wallet readiness
+                        amountDisplayManager.updateDisplay(
+                            satoshiInput,
+                            fiatInput,
+                            AmountDisplayManager.AnimationType.NONE
+                        )
+                    }
+                }
+            }
+        }
     }
 
     /** Handle initial payment amount from basket */
@@ -117,6 +147,7 @@ class PosUiCoordinator(
     }
 
     /** Handle NFC payment */
+    @Suppress("DEPRECATION")
     fun handleNfcPayment(tag: android.nfc.Tag) {
         nfcPaymentProcessor.handleNfcPayment(tag, amountDisplayManager.requestedAmount)
     }
@@ -144,8 +175,8 @@ class PosUiCoordinator(
         
         // Vibrate
         try {
-            val vibrator = activity.getSystemService(android.content.Context.VIBRATOR_SERVICE) as android.os.Vibrator?
-            vibrator?.vibrate(PATTERN_SUCCESS, -1)
+            val vibrator = activity.getVibrator()
+            vibrator?.vibrateCompat(PATTERN_SUCCESS, -1)
         } catch (e: Exception) {
             android.util.Log.e("PosUiCoordinator", "Error vibrating: ${e.message}")
         }
@@ -297,6 +328,9 @@ class PosUiCoordinator(
     fun hideChargeButtonSpinner() {
         submitButtonSpinner.visibility = View.GONE
         submitButton.text = activity.getString(R.string.pos_charge_button) // Restore button text
-        submitButton.isEnabled = true
+        // Only re-enable if the wallet is ready
+        val isReady = CashuWalletManager.walletState.value == com.electricdreams.numo.core.cashu.WalletState.READY
+        submitButton.isEnabled = isReady
+        submitButton.alpha = if (isReady) 1.0f else 0.5f
     }
 }

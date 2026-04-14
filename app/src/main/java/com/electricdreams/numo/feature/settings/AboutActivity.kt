@@ -11,6 +11,8 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.electricdreams.numo.BuildConfig
 import com.electricdreams.numo.R
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 
 /**
  * About screen showing app information, device info, and links.
@@ -25,6 +27,12 @@ class AboutActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_about)
+
+        ViewCompat.setOnApplyWindowInsetsListener(findViewById(android.R.id.content)) { v, windowInsets ->
+            val insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
+            v.setPadding(0, insets.top, 0, insets.bottom)
+            WindowInsetsCompat.CONSUMED
+        }
 
         setupViews()
         populateDeviceInfo()
@@ -121,17 +129,37 @@ class AboutActivity : AppCompatActivity() {
     }
 
     private fun showTermsDialog() {
-        AlertDialog.Builder(this)
+        val textView = android.widget.TextView(this).apply {
+            text = getString(R.string.terms_of_service_full)
+            typeface = android.graphics.Typeface.MONOSPACE
+            val padding = (16 * resources.displayMetrics.density).toInt()
+            setPadding(padding, padding, padding, padding)
+            textSize = 12f
+        }
+        val scrollView = android.widget.ScrollView(this).apply {
+            addView(textView)
+        }
+        androidx.appcompat.app.AlertDialog.Builder(this)
             .setTitle(R.string.settings_about_dialog_terms_title)
-            .setMessage(R.string.terms_of_service_full)
+            .setView(scrollView)
             .setPositiveButton(R.string.common_close, null)
             .show()
     }
 
     private fun showPrivacyDialog() {
-        AlertDialog.Builder(this)
+        val textView = android.widget.TextView(this).apply {
+            text = getString(R.string.privacy_policy_full)
+            typeface = android.graphics.Typeface.MONOSPACE
+            val padding = (16 * resources.displayMetrics.density).toInt()
+            setPadding(padding, padding, padding, padding)
+            textSize = 12f
+        }
+        val scrollView = android.widget.ScrollView(this).apply {
+            addView(textView)
+        }
+        androidx.appcompat.app.AlertDialog.Builder(this)
             .setTitle(R.string.settings_about_dialog_privacy_title)
-            .setMessage(R.string.privacy_policy_full)
+            .setView(scrollView)
             .setPositiveButton(R.string.common_close, null)
             .show()
     }
