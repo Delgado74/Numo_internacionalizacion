@@ -96,6 +96,7 @@ class PaymentRequestActivity : AppCompatActivity() {
     private enum class OverlayActionMode { SUCCESS, ERROR }
 
     private var paymentAmount: Long = 0
+    private var activeUnit: String = "sat"  // sat, usd, eur from mint selection
     private var bitcoinPriceWorker: BitcoinPriceWorker? = null
     private var hcePaymentRequest: String? = null
     private var hcePaymentRequestBech32: String? = null
@@ -266,6 +267,7 @@ class PaymentRequestActivity : AppCompatActivity() {
 
         // Get payment amount from intent
         paymentAmount = intent.getLongExtra(EXTRA_PAYMENT_AMOUNT, 0)
+        activeUnit = intent.getStringExtra(EXTRA_ACTIVE_UNIT) ?: "sat"
 
         if (paymentAmount <= 0) {
             Log.e(TAG, "Invalid payment amount: $paymentAmount")
@@ -761,7 +763,7 @@ class PaymentRequestActivity : AppCompatActivity() {
             )
         } else {
             // Start fresh Lightning flow
-            lightningHandler?.start(paymentAmount, createLightningCallback())
+            lightningHandler?.start(paymentAmount, createLightningCallback(), activeUnit)
         }
     }
 
@@ -1742,6 +1744,7 @@ class PaymentRequestActivity : AppCompatActivity() {
 
         const val EXTRA_PAYMENT_AMOUNT = "payment_amount"
         const val EXTRA_FORMATTED_AMOUNT = "formatted_amount"
+        const val EXTRA_ACTIVE_UNIT = "active_unit"  // sat, usd, eur from mint selection
         const val RESULT_EXTRA_TOKEN = "payment_token"
         const val RESULT_EXTRA_AMOUNT = "payment_amount"
 

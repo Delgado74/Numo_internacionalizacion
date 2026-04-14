@@ -301,6 +301,57 @@ object CashuWalletManager : MintManager.MintChangeListener {
     }
 
     /**
+     * Extract supported currency units from MintInfo.
+     * Looks at NUT-04 methods to determine what units the mint supports.
+     * @return List of supported units (e.g., ["sat", "usd"])
+     */
+    fun getSupportedUnits(mintInfo: org.cashudevkit.MintInfo): List<String> {
+        val units = mutableSetOf<String>()
+        
+        try {
+            val nuts = mintInfo.nuts
+            if (nuts != null) {
+                try {
+                    val nut04Class = nuts.nut04
+                    if (nut04Class != null) {
+                        val methods = nut04Class.methods
+                        if (methods != null) {
+                            for (method in methods) {
+                                val unit = method.unit
+                                if (unit != null) {
+                                    val unitStr = when (unit) {
+                                        CurrencyUnit.Sat -> "sat"
+                                        CurrencyUnit.Usd -> "usd"
+                                        CurrencyUnit.Eur -> "eur"
+                                        else -> unit.toString().lowercase()
+                                    }
+                                    units.add(unitStr)
+                                    Log.d(TAG, "Found unit from nut04.methods: $unitStr")
+                                }
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to get units from nut04.methods: ${e.message}")
+                }
+            } else {
+                Log.w(TAG, "nuts is null in MintInfo")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to extract units from mint info: ${e.message}", e)
+        }
+        
+        if (units.isEmpty()) {
+            Log.d(TAG, "No units detected, defaulting to [sat]")
+            return listOf("sat")
+        }
+        
+        val result = units.toList()
+        Log.d(TAG, "Detected units: $result")
+        return result
+    }
+
+    /**
      * Convert MintInfo to JSON string for storage.
      */
     fun mintInfoToJson(info: org.cashudevkit.MintInfo): String {

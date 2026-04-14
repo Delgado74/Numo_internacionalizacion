@@ -174,6 +174,7 @@ class MintProfileService private constructor(context: Context) {
         var infoJson: String? = null
         var displayName: String? = null
         var iconUrl: String? = null
+        var supportedUnits: List<String>? = null
 
         try {
             val cdkInfo = CashuWalletManager.fetchMintInfo(normalizedUrl)
@@ -181,6 +182,7 @@ class MintProfileService private constructor(context: Context) {
                 infoJson = CashuWalletManager.mintInfoToJson(cdkInfo)
                 displayName = cdkInfo.name?.trim()?.takeIf { it.isNotEmpty() }
                 iconUrl = cdkInfo.iconUrl?.trim()?.takeIf { it.isNotEmpty() }
+                supportedUnits = CashuWalletManager.getSupportedUnits(cdkInfo)
             }
         } catch (e: Exception) {
             Log.w(TAG, "CDK mint info fetch failed for $normalizedUrl", e)
@@ -202,10 +204,21 @@ class MintProfileService private constructor(context: Context) {
             infoJson = canonicalInfo.toString()
             displayName = canonicalInfo.optString("name", "").trim().ifEmpty { null }
             iconUrl = canonicalInfo.optString("iconUrl", "").trim().ifEmpty { null }
+            
+            // Try to extract units from network response (NUT-04)
+            supportedUnits = extractUnitsFromNetworkInfo(canonicalInfo)
         }
 
         mintManager.setMintInfo(normalizedUrl, infoJson)
         mintManager.setMintRefreshTimestamp(normalizedUrl)
+        
+        // Store supported units if detected
+        if (supportedUnits != null && supportedUnits.isNotEmpty()) {
+            mintManager.setSupportedUnits(normalizedUrl, supportedUnits)
+            Log.d(TAG, "Stored supported units for $normalizedUrl: $supportedUnits")
+        } else {
+            Log.d(TAG, "No supported units detected for $normalizedUrl, will use default")
+        }
 
         var iconCached = false
         if (!iconUrl.isNullOrBlank()) {
@@ -219,6 +232,58 @@ class MintProfileService private constructor(context: Context) {
             iconCached = iconCached,
             errorType = null,
         )
+    }
+    
+    private fun extractUnitsFromNetworkInfo(json: JSONObject): List<String>? {
+        return try {
+            val units = mutableSetOf<String>()
+            
+            // Look for nuts.nut-04 (key is "4", not "04")
+            if (json.has("nuts")) {
+                val nuts = json.getJSONObject("nuts")
+                
+                // Try both "4" and "04" for compatibility
+                val nut04Key = if (nuts.has("4")) "4" else if (nuts.has("04")) "04" else null
+                
+                if (nut04Key != null) {
+                    val nut04 = nuts.getJSONObject(nut04Key)
+                    
+                    // Check for mint_method object with unit
+                    if (nut04.has("mint_method")) {
+                        val method = nut04.getJSONObject("mint_method")
+                        if (method.has("unit")) {
+                            units.add(method.getString("unit"))
+                        }
+                        // Also check methods array
+                        if (method.has("methods")) {
+                            val methods = method.getJSONArray("methods")
+                            for (i in 0 until methods.length()) {
+                                val m = methods.getJSONObject(i)
+                                if (m.has("unit")) {
+                                    units.add(m.getString("unit"))
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Also check methods array at nut04 level
+                    if (nut04.has("methods")) {
+                        val methods = nut04.getJSONArray("methods")
+                        for (i in 0 until methods.length()) {
+                            val m = methods.getJSONObject(i)
+                            if (m.has("unit")) {
+                                units.add(m.getString("unit"))
+                            }
+                        }
+                    }
+                }
+            }
+            
+            if (units.isEmpty()) null else units.toList()
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to extract units from network info", e)
+            null
+        }
     }
 
     private data class NetworkMintInfoResult(

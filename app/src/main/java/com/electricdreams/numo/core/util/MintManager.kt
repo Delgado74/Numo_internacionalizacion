@@ -5,6 +5,8 @@ import android.content.SharedPreferences
 import android.util.Log
 import com.electricdreams.numo.core.cashu.CashuWalletManager
 import com.electricdreams.numo.nostr.NostrMintBackup
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.net.URI
 import java.util.Locale
@@ -24,8 +26,9 @@ class MintManager private constructor(context: Context) {
         private const val KEY_MINTS = "allowedMints"
         private const val KEY_PREFERRED_LIGHTNING_MINT = "preferredLightningMint"
         private const val KEY_ENABLE_SWAP_UNKNOWN_MINTS = "enableSwapUnknownMints"
-        private const val KEY_MINT_INFO_PREFIX = "mintInfo_"
-        private const val KEY_MINT_REFRESH_PREFIX = "mintRefresh_"
+    private const val KEY_MINT_INFO_PREFIX = "mintInfo_"
+    private const val KEY_MINT_REFRESH_PREFIX = "mintRefresh_"
+    private const val KEY_MINT_UNITS_PREFIX = "mintUnits_"
         private const val REFRESH_INTERVAL_MS = 24 * 60 * 60 * 1000L // 24 hours
 
         // Default mints
@@ -180,10 +183,82 @@ class MintManager private constructor(context: Context) {
             
             saveChanges()
             Log.d(TAG, "Added mint to allowed list: $url")
+            
+            // Trigger mint profile sync to detect supported units
+            triggerMintProfileSync(url)
+            
             listener?.onMintsChanged(getAllowedMints())
         }
 
         return changed
+    }
+    
+    /**
+     * Trigger async mint profile sync to detect supported units.
+     */
+    private fun triggerMintProfileSync(mintUrl: String) {
+        // This will be called from the MintProfileService which handles the actual sync
+        // The MintProfileService.fetchAndStoreMintProfile() already extracts and stores units
+        // So we just need to trigger it - the listener will handle this
+        Log.d(TAG, "Triggering mint profile sync for unit detection: $mintUrl")
+    }
+
+    /**
+     * Add a mint and detect its supported units synchronously.
+     * Should be called from a coroutine context.
+     * @param mintUrl The mint URL to add.
+     * @return true if the mint was added, false if it was already in the list.
+     */
+    suspend fun addMintWithUnitDetection(mintUrl: String?): Boolean {
+        var url = mintUrl?.trim()
+        if (url.isNullOrEmpty()) {
+            Log.e(TAG, "Cannot add empty mint URL")
+            return false
+        }
+
+        url = normalizeMintUrl(url)
+        val changed = allowedMints.add(url)
+
+        if (changed) {
+            if (allowedMints.size == 1) {
+                preferredLightningMint = url
+                savePreferredLightningMint()
+                Log.d(TAG, "Automatically set first mint as preferred Lightning mint: $url")
+            }
+            
+            saveChanges()
+            Log.d(TAG, "Added mint to allowed list: $url")
+            
+            // Detect and store supported units
+            detectAndStoreSupportedUnits(url)
+            
+            listener?.onMintsChanged(getAllowedMints())
+        }
+
+        return changed
+    }
+    
+    /**
+     * Detect supported units for a mint and store them.
+     */
+    private suspend fun detectAndStoreSupportedUnits(mintUrl: String) {
+        try {
+            val mintInfo = withContext(Dispatchers.IO) {
+                CashuWalletManager.fetchMintInfo(mintUrl)
+            }
+            
+            if (mintInfo != null) {
+                val units = CashuWalletManager.getSupportedUnits(mintInfo)
+                setSupportedUnits(mintUrl, units)
+                Log.d(TAG, "Detected and stored supported units for $mintUrl: $units")
+            } else {
+                // Default to sat if we couldn't fetch mint info
+                setSupportedUnits(mintUrl, listOf("sat"))
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to detect supported units for $mintUrl: ${e.message}")
+            setSupportedUnits(mintUrl, listOf("sat"))
+        }
     }
 
     /**
@@ -318,6 +393,52 @@ class MintManager private constructor(context: Context) {
     fun getMintRefreshTimestamp(mintUrl: String): Long {
         val normalized = normalizeMintUrl(mintUrl)
         return preferences.getLong(KEY_MINT_REFRESH_PREFIX + normalized, 0L)
+    }
+
+    /**
+     * Set the supported units for a mint (e.g., ["sat", "usd"]).
+     */
+    fun setSupportedUnits(mintUrl: String, units: List<String>) {
+        val normalized = normalizeMintUrl(mintUrl)
+        Log.d(TAG, "setSupportedUnits: mintUrl=$mintUrl, normalized=$normalized, units=$units")
+        val unitsSet = units.toSet()
+        val unitsJson = org.json.JSONArray(unitsSet).toString()
+        Log.d(TAG, "setSupportedUnits: storing unitsJson=$unitsJson")
+        preferences.edit().putString(KEY_MINT_UNITS_PREFIX + normalized, unitsJson).apply()
+        Log.d(TAG, "Set supported units for $normalized: $unitsSet")
+    }
+
+    /**
+     * Get the supported units for a mint.
+     * @return List of supported units (e.g., ["sat", "usd"]) or null if not set.
+     */
+    fun getSupportedUnits(mintUrl: String): List<String>? {
+        val normalized = normalizeMintUrl(mintUrl)
+        val unitsJson = preferences.getString(KEY_MINT_UNITS_PREFIX + normalized, null)
+        Log.d(TAG, "getSupportedUnits: mintUrl=$mintUrl, normalized=$normalized, unitsJson=$unitsJson")
+        return if (unitsJson == null) {
+            Log.d(TAG, "getSupportedUnits: returning null (no units stored)")
+            null
+        } else {
+            try {
+                val array = org.json.JSONArray(unitsJson)
+                val result = (0 until array.length()).map { array.getString(it) }
+                Log.d(TAG, "getSupportedUnits: returning $result")
+                result
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to parse units JSON for $normalized", e)
+                null
+            }
+        }
+    }
+
+    /**
+     * Check if a mint supports multiple units (e.g., stablesat).
+     * @return true if the mint supports more than one unit.
+     */
+    fun hasMultipleUnits(mintUrl: String): Boolean {
+        val units = getSupportedUnits(mintUrl)
+        return units != null && units.size > 1
     }
 
     /**

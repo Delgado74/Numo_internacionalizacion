@@ -474,6 +474,7 @@ class MintsSettingsActivity : AppCompatActivity() {
 
             val added = mintManager.addMint(normalizedUrl)
             if (added) {
+                // Must await to ensure units are detected before returning
                 mintProfileService.fetchAndStoreMintProfile(normalizedUrl)
                 loadMintsAndBalances()
                 addMintCard.clearInput()
