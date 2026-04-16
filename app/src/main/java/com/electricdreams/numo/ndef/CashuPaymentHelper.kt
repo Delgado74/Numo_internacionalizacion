@@ -70,13 +70,16 @@ object CashuPaymentHelper {
         amount: Long,
         description: String?,
         allowedMints: List<String>?,
+        unit: String = "sat",
     ): GeneratedPaymentRequest? {
+        Log.d(TAG, "createPaymentRequest called: amount=$amount, unit=$unit")
         return try {
             val map = com.upokecenter.cbor.CBORObject.NewMap()
             map.Add("i", java.util.UUID.randomUUID().toString().substring(0, 8))
             map.Add("a", amount)
-            map.Add("u", "sat")
-            map.Add("d", description ?: "Payment for $amount sats")
+            map.Add("u", unit)
+            val unitDesc = if (unit == "sat") "sats" else unit
+            map.Add("d", description ?: "Payment for $amount $unitDesc")
             map.Add("s", true)
             if (!allowedMints.isNullOrEmpty()) {
                 val mintsArray = com.upokecenter.cbor.CBORObject.NewArray()
@@ -103,8 +106,8 @@ object CashuPaymentHelper {
         }
     }
 
-    fun createPaymentRequest(amount: Long, description: String?): GeneratedPaymentRequest? =
-        createPaymentRequest(amount, description, null)
+    fun createPaymentRequest(amount: Long, description: String?, unit: String = "sat"): GeneratedPaymentRequest? =
+        createPaymentRequest(amount, description, null, unit)
 
     @JvmStatic
     fun createPaymentRequestWithNostr(
@@ -112,13 +115,15 @@ object CashuPaymentHelper {
         description: String?,
         allowedMints: List<String>?,
         nprofile: String,
+        unit: String = "sat",
     ): GeneratedPaymentRequest? {
         return try {
             val map = com.upokecenter.cbor.CBORObject.NewMap()
             map.Add("i", java.util.UUID.randomUUID().toString().substring(0, 8))
             map.Add("a", amount)
-            map.Add("u", "sat")
-            map.Add("d", description ?: "Payment for $amount sats")
+            map.Add("u", unit)
+            val unitDesc = if (unit == "sat") "sats" else unit
+            map.Add("d", description ?: "Payment for $amount $unitDesc")
             map.Add("s", true)
             if (!allowedMints.isNullOrEmpty()) {
                 val mintsArray = com.upokecenter.cbor.CBORObject.NewArray()
@@ -344,26 +349,31 @@ object CashuPaymentHelper {
             )
 
             val mintUrl = cdkToken.mintUrl().url
-            val unit = cdkToken.unit().let { tokenUnit ->
-                when (tokenUnit) {
-                    is CurrencyUnit.Sat -> "sat"
-                    is CurrencyUnit.Msat -> "msat"
-                    is CurrencyUnit.Eur -> "eur"
-                    is CurrencyUnit.Usd -> "usd"
-                    is CurrencyUnit.Custom -> tokenUnit.unit
-                    else -> "sat"
-                }
-            }
-            if (unit != "sat") {
-                throw RedemptionException("Unsupported token unit: $unit")
+            val tokenUnit = cdkToken.unit() ?: CurrencyUnit.Sat
+            val unit = when (tokenUnit) {
+                is CurrencyUnit.Sat -> "sat"
+                is CurrencyUnit.Usd -> "usd"
+                is CurrencyUnit.Eur -> "eur"
+                is CurrencyUnit.Msat -> "msat"
+                is CurrencyUnit.Custom -> tokenUnit.unit
+                else -> "sat"
             }
 
             val wallet = CashuWalletManager.getWallet()
                 ?: throw RedemptionException("CDK wallet not initialized")
 
-            val mintWallet = wallet.getWallet(cdkToken.mintUrl(), cdkToken.unit() ?: CurrencyUnit.Sat)
-                ?: throw RedemptionException("Failed to get wallet for mint: ${cdkToken.mintUrl().url}")
-
+            // Get or create wallet for the token's unit (SAT or USD)
+            var mintWallet = wallet.getWallet(cdkToken.mintUrl(), tokenUnit)
+            if (mintWallet == null) {
+                Log.d(TAG, "Wallet for mint $mintUrl (unit: $unit) not found, creating...")
+                wallet.createWallet(cdkToken.mintUrl(), tokenUnit, 10u)
+                mintWallet = wallet.getWallet(cdkToken.mintUrl(), tokenUnit)
+                    ?: throw RedemptionException("Failed to get wallet for mint: $mintUrl (unit: $unit)")
+                Log.d(TAG, "Wallet created successfully for mint $mintUrl (unit: $unit)")
+            } else {
+                Log.d(TAG, "Using existing wallet for mint $mintUrl (unit: $unit)")
+            }
+            
             val receiveOptions = org.cashudevkit.ReceiveOptions(
                 amountSplitTarget = org.cashudevkit.SplitTarget.None,
                 p2pkSigningKeys = emptyList(),
@@ -372,8 +382,8 @@ object CashuPaymentHelper {
             )
 
             mintWallet.receive(cdkToken, receiveOptions)
-
-            Log.d(TAG, "Token received via CDK successfully (mintUrl=$mintUrl)")
+            
+            Log.d(TAG, "Token received successfully for mint $mintUrl (unit: $unit)")
             // Return the original token instead of sending a new one
             tokenString
         } catch (e: RedemptionException) {
@@ -387,16 +397,29 @@ object CashuPaymentHelper {
 
     @Throws(RedemptionException::class)
     private suspend fun redeemProofs(proofs: List<org.cashudevkit.Proof>, mintUrl: String, unit: String) {
-        if (unit != "sat") {
-            throw RedemptionException("Unsupported token unit: $unit")
-        }
-
         val wallet = CashuWalletManager.getWallet()
             ?: throw RedemptionException("CDK wallet not initialized")
 
-        val mintWallet = wallet.getWallet(MintUrl(mintUrl), CurrencyUnit.Sat)
-            ?: throw RedemptionException("Failed to get wallet for mint: $mintUrl")
+        val currencyUnit = when (unit) {
+            "usd" -> CurrencyUnit.Usd
+            "eur" -> CurrencyUnit.Eur
+            "sat" -> CurrencyUnit.Sat
+            else -> CurrencyUnit.Sat
+        }
 
+        // Get or create wallet for the token's unit
+        var mintWallet = wallet.getWallet(MintUrl(mintUrl), currencyUnit)
+        if (mintWallet == null) {
+            Log.d(TAG, "Creating wallet for mint $mintUrl (unit: $unit, currencyUnit: $currencyUnit)")
+            wallet.createWallet(MintUrl(mintUrl), currencyUnit, 10u)
+            mintWallet = wallet.getWallet(MintUrl(mintUrl), currencyUnit)
+                ?: throw RedemptionException("Failed to get wallet for mint: $mintUrl (unit: $unit)")
+        } else {
+            Log.d(TAG, "Using existing wallet for mint $mintUrl (unit: $unit)")
+        }
+
+        Log.d(TAG, "Calling receiveProofs: proofs count=${proofs.size}, unit=$unit")
+        
         val receiveOptions = ReceiveOptions(
             amountSplitTarget = SplitTarget.None,
             p2pkSigningKeys = emptyList(),
@@ -404,7 +427,13 @@ object CashuPaymentHelper {
             metadata = emptyMap(),
         )
 
-        mintWallet.receiveProofs(proofs, receiveOptions, null, null)
+        try {
+            mintWallet.receiveProofs(proofs, receiveOptions, null, null)
+            Log.d(TAG, "receiveProofs completed successfully for mint $mintUrl (unit: $unit)")
+        } catch (e: Exception) {
+            Log.e(TAG, "receiveProofs failed for mint $mintUrl (unit: $unit): ${e.message}", e)
+            throw RedemptionException("Failed to receive proofs: ${e.message}", e)
+        }
     }
 
     // === High-level redemption with optional swap-to-Lightning-mint ========
@@ -422,10 +451,6 @@ object CashuPaymentHelper {
         allowedMints: List<String>?,
         paymentContext: SwapToLightningMintManager.PaymentContext
     ): String {
-        if (unit != "sat") {
-            throw RedemptionException("Unsupported token unit: $unit")
-        }
-
         val tokenAmount = proofs.map { it.amount.value.toLong() }.sum()
         if (tokenAmount < expectedAmount) {
             throw RedemptionException(
@@ -436,7 +461,7 @@ object CashuPaymentHelper {
         val isAllowed = allowedMints.isNullOrEmpty() || allowedMints.contains(mintUrl)
 
         if (isAllowed) {
-            Log.d(TAG, "Token mint validated as allowed: $mintUrl")
+            Log.d(TAG, "Token mint validated as allowed: $mintUrl, unit=$unit")
             // Standard Cashu redemption path
             try {
                 redeemProofs(proofs, mintUrl, unit)
@@ -519,25 +544,28 @@ object CashuPaymentHelper {
 
             is TokenValidationResult.ValidKnownMint -> {
                 val cdkToken = result.token
-                val unit = cdkToken.unit().let { tokenUnit ->
-                    when (tokenUnit) {
-                        is CurrencyUnit.Sat -> "sat"
-                        is CurrencyUnit.Msat -> "msat"
-                        is CurrencyUnit.Eur -> "eur"
-                        is CurrencyUnit.Usd -> "usd"
-                        is CurrencyUnit.Custom -> tokenUnit.unit
-                        else -> "sat"
-                    }
-                }
-                if (unit != "sat") {
-                    throw RedemptionException("Unsupported token unit: $unit")
+                val tokenUnit = cdkToken.unit() ?: CurrencyUnit.Sat
+                val unit = when (tokenUnit) {
+                    is CurrencyUnit.Sat -> "sat"
+                    is CurrencyUnit.Usd -> "usd"
+                    is CurrencyUnit.Eur -> "eur"
+                    is CurrencyUnit.Msat -> "msat"
+                    is CurrencyUnit.Custom -> tokenUnit.unit
+                    else -> "sat"
                 }
 
                 val wallet = CashuWalletManager.getWallet()
                     ?: throw RedemptionException("CDK wallet not initialized")
 
-                val mintWallet = wallet.getWallet(cdkToken.mintUrl(), cdkToken.unit() ?: CurrencyUnit.Sat)
-                    ?: throw RedemptionException("Failed to get wallet for mint: ${cdkToken.mintUrl().url}")
+                // Get or create wallet for the token's unit (SAT or USD)
+                var mintWallet = wallet.getWallet(cdkToken.mintUrl(), tokenUnit)
+                if (mintWallet == null) {
+                    Log.d(TAG, "Wallet for mint ${cdkToken.mintUrl().url} (unit: $unit) not found, creating...")
+                    wallet.createWallet(cdkToken.mintUrl(), tokenUnit, 10u)
+                    mintWallet = wallet.getWallet(cdkToken.mintUrl(), tokenUnit)
+                        ?: throw RedemptionException("Failed to get wallet for mint: ${cdkToken.mintUrl().url}")
+                    Log.d(TAG, "Wallet created successfully for mint ${cdkToken.mintUrl().url} (unit: $unit)")
+                }
 
                 val receiveOptions = org.cashudevkit.ReceiveOptions(
                     amountSplitTarget = org.cashudevkit.SplitTarget.None,
@@ -547,7 +575,9 @@ object CashuPaymentHelper {
                 )
 
                 try {
+                    Log.d(TAG, "Receiving token in redeemTokenWithSwap: mint=${cdkToken.mintUrl().url}, unit=$unit")
                     mintWallet.receive(cdkToken, receiveOptions)
+                    Log.d(TAG, "Token received successfully (unit: $unit)")
                     tokenString ?: "" // SUCCESS!
                 } catch (e: Exception) {
                     Log.e(TAG, "Failed to redeem token for known mint", e)
@@ -637,20 +667,17 @@ object CashuPaymentHelper {
             val payload = org.cashudevkit.PaymentRequestPayload.fromString(payloadJson)
 
             val mintUrl = payload.mint().url
-            val unit = payload.unit().let { tokenUnit ->
-                when (tokenUnit) {
-                    is CurrencyUnit.Sat -> "sat"
-                    is CurrencyUnit.Msat -> "msat"
-                    is CurrencyUnit.Eur -> "eur"
-                    is CurrencyUnit.Usd -> "usd"
-                    is CurrencyUnit.Custom -> tokenUnit.unit
-                    else -> "sat"
-                }
+            val tokenUnit = payload.unit() ?: CurrencyUnit.Sat
+            val unit = when (tokenUnit) {
+                is CurrencyUnit.Sat -> "sat"
+                is CurrencyUnit.Usd -> "usd"
+                is CurrencyUnit.Eur -> "eur"
+                is CurrencyUnit.Msat -> "msat"
+                is CurrencyUnit.Custom -> tokenUnit.unit
+                else -> "sat"
             }
             
-            if (unit != "sat") {
-                 throw RedemptionException("Unsupported unit in PaymentRequestPayload: $unit")
-            }
+            Log.d(TAG, "Redeeming PaymentRequestPayload: mintUrl=$mintUrl, unit=$unit")
             
             val proofs = payload.proofs()
 

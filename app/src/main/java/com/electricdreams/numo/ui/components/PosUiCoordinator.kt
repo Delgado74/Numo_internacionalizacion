@@ -405,11 +405,20 @@ class PosUiCoordinator(
             }
 
             if (amountDisplayManager.requestedAmount > 0) {
-                Log.d("PosUiCoordinator", "Charge clicked: amount=${amountDisplayManager.requestedAmount}, activeUnit=$activeUnit")
+                Log.d("PosUiCoordinator", "Charge clicked: requestedAmount=${amountDisplayManager.requestedAmount}, originalAmount=${amountDisplayManager.originalAmount}, activeUnit=$activeUnit, isStablesat=${amountDisplayManager.isStablesatUnit()}")
                 showChargeButtonSpinner()
                 val formattedAmount = amountDisplay.text.toString()
+                
+                // Use originalAmount for PaymentRequest when in USD mode, requestedAmount for SAT
+                val paymentAmount = if (activeUnit == "usd" || activeUnit == "eur") {
+                    amountDisplayManager.originalAmount
+                } else {
+                    amountDisplayManager.requestedAmount
+                }
+                
+                Log.d("PosUiCoordinator", "Calling showPaymentMethodDialog: amount=$paymentAmount, activeUnit=$activeUnit")
                 paymentMethodHandler.showPaymentMethodDialog(
-                    amountDisplayManager.requestedAmount, 
+                    paymentAmount, 
                     formattedAmount,
                     activeUnit
                 )

@@ -286,6 +286,36 @@ object CashuWalletManager : MintManager.MintChangeListener {
     }
 
     /**
+     * Get balances for all configured mints by unit.
+     * Returns a map of mint URL string to another map of unit to balance.
+     * Example: { "mint.url": { "sat": 5000, "usd": 1000 } }
+     */
+    suspend fun getAllMintBalancesByUnit(): Map<String, Map<String, Long>> {
+        val w = wallet ?: return emptyMap()
+        return try {
+            val balanceMap = w.getBalances()
+            val result = mutableMapOf<String, MutableMap<String, Long>>()
+            
+            for ((key, value) in balanceMap) {
+                val mintUrl = key.mintUrl.url.removeSuffix("/")
+                val unit = when (key.unit) {
+                    is CurrencyUnit.Sat -> "sat"
+                    is CurrencyUnit.Usd -> "usd"
+                    is CurrencyUnit.Eur -> "eur"
+                    else -> continue
+                }
+                
+                result.getOrPut(mintUrl) { mutableMapOf() }[unit] = value.value.toLong()
+            }
+            
+            result
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting mint balances by unit: ${e.message}", e)
+            emptyMap()
+        }
+    }
+
+    /**
      * Fetch mint info from a mint URL using CDK.
      * Returns the MintInfo object, or null if it cannot be fetched.
      */

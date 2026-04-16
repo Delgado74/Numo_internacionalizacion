@@ -267,7 +267,9 @@ class PaymentRequestActivity : AppCompatActivity() {
 
         // Get payment amount from intent
         paymentAmount = intent.getLongExtra(EXTRA_PAYMENT_AMOUNT, 0)
-        activeUnit = intent.getStringExtra(EXTRA_ACTIVE_UNIT) ?: "sat"
+        val intentUnit = intent.getStringExtra(EXTRA_ACTIVE_UNIT)
+        activeUnit = intentUnit ?: "sat"
+        Log.d(TAG, "onCreate: EXTRA_ACTIVE_UNIT from intent='$intentUnit', activeUnit='$activeUnit'")
 
         if (paymentAmount <= 0) {
             Log.e(TAG, "Invalid payment amount: $paymentAmount")
@@ -550,8 +552,10 @@ class PaymentRequestActivity : AppCompatActivity() {
             val generatedHce = CashuPaymentHelper.createPaymentRequest(
                 paymentAmount,
                 getString(R.string.payment_request_default_description, paymentAmount),
-                mintsForPaymentRequest
+                mintsForPaymentRequest,
+                activeUnit
             )
+            Log.d(TAG, "Creating PaymentRequest with unit: $activeUnit, amount: $paymentAmount")
             hcePaymentRequest = generatedHce?.original
             hcePaymentRequestBech32 = generatedHce?.bech32
 
@@ -569,7 +573,7 @@ class PaymentRequestActivity : AppCompatActivity() {
         }
 
         // Initialize Nostr handler and start payment flow
-        nostrHandler = NostrPaymentHandler(this, allowedMints)
+        nostrHandler = NostrPaymentHandler(this, allowedMints, activeUnit)
         startNostrPaymentFlow()
 
         // Lightning flow is now also started immediately (see startLightningMintFlow() call above)

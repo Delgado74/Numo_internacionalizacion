@@ -21,7 +21,8 @@ import com.electricdreams.numo.nostr.NostrPaymentListener
  */
 class NostrPaymentHandler(
     private val context: Context,
-    private val allowedMints: List<String>
+    private val allowedMints: List<String>,
+    private val activeUnit: String = "sat"
 ) {
     /**
      * Callback interface for Nostr payment events.
@@ -146,7 +147,8 @@ class NostrPaymentHandler(
             paymentAmount,
             context.getString(R.string.payment_request_default_description, paymentAmount),
             mintsForPaymentRequest,
-            profile
+            profile,
+            activeUnit
         )
 
         if (request == null) {

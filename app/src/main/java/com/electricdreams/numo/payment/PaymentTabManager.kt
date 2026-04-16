@@ -66,8 +66,12 @@ class PaymentTabManager(
             enableTransitionType(LayoutTransition.CHANGING)
         }
         
-        // Default: show Unified
-        selectTab(PaymentTab.UNIFIED)
+        // Default: hide Unified tab (HCE mode not supported in Numo)
+        unifiedTab.visibility = View.GONE
+        unifiedQrContainer.visibility = View.GONE
+        
+        // Default: show Cashu
+        selectTab(PaymentTab.CASHU)
 
         unifiedTab.setOnClickListener { selectTab(PaymentTab.UNIFIED) }
         cashuTab.setOnClickListener { selectTab(PaymentTab.CASHU) }

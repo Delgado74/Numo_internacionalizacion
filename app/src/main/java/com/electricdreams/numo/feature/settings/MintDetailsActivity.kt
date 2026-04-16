@@ -65,6 +65,7 @@ class MintDetailsActivity : AppCompatActivity() {
     private lateinit var mintName: TextView
     private lateinit var mintUrlText: TextView
     private lateinit var balanceText: TextView
+    private lateinit var balanceUsdText: TextView
     private lateinit var lightningBadge: LinearLayout
 
     // Content sections
@@ -167,6 +168,7 @@ class MintDetailsActivity : AppCompatActivity() {
         mintName = findViewById(R.id.mint_name)
         mintUrlText = findViewById(R.id.mint_url)
         balanceText = findViewById(R.id.balance_text)
+        balanceUsdText = findViewById(R.id.balance_usd_text)
         lightningBadge = findViewById(R.id.lightning_badge)
         
         descriptionSection = findViewById(R.id.description_section)
@@ -358,11 +360,22 @@ class MintDetailsActivity : AppCompatActivity() {
 
     private fun loadBalance() {
         lifecycleScope.launch {
-            val balances = withContext(Dispatchers.IO) {
-                CashuWalletManager.getAllMintBalances()
+            val balancesByUnit = withContext(Dispatchers.IO) {
+                CashuWalletManager.getAllMintBalancesByUnit()
             }
-            val balance = balances[mintUrl] ?: 0L
-            balanceText.text = Amount(balance, Amount.Currency.BTC).toString()
+            
+            val mintBalances = balancesByUnit[mintUrl]
+            val satBalance = mintBalances?.get("sat") ?: 0L
+            val usdBalance = mintBalances?.get("usd") ?: 0L
+            
+            balanceText.text = Amount(satBalance, Amount.Currency.BTC).toString()
+            
+            if (usdBalance > 0) {
+                balanceUsdText.visibility = View.VISIBLE
+                balanceUsdText.text = "$${usdBalance / 100.0}"
+            } else {
+                balanceUsdText.visibility = View.GONE
+            }
         }
     }
 
