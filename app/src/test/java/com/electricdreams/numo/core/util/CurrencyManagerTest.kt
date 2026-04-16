@@ -176,8 +176,8 @@ class CurrencyManagerTest {
     fun `parsePriceResponse parses Yadio response for USD`() {
         currencyManager.setPreferredCurrency("USD")
         // Yadio response format: rate = BTC per 1 USD, so we invert it
-        // 1 / 97500.50 = 1.02564e-5
-        val yadioResponse = """{"rate":1.02564e-5,"timestamp":1776302704254}"""
+        // 1 / 97500.50 = 1.025635765970e-5
+        val yadioResponse = """{"rate":1.025635765970e-5,"timestamp":1776302704254}"""
         assertEquals(97500.50, currencyManager.parsePriceResponse(yadioResponse), 0.01)
     }
 
