@@ -11,7 +11,11 @@ import android.widget.Toast
 import com.electricdreams.numo.core.model.Amount
 import com.electricdreams.numo.core.prefs.PreferenceStore
 import com.electricdreams.numo.core.util.CurrencyManager
+import com.electricdreams.numo.core.util.MintLimitChecker
 import com.electricdreams.numo.core.worker.BitcoinPriceWorker
+import com.electricdreams.numo.core.util.NetworkUtils
+
+private const val TAG = "AmountDisplayManager"
 
 /**
  * Manages amount display, formatting, and currency animations for the POS interface.
@@ -37,6 +41,17 @@ class AmountDisplayManager(
     // Unit from mint selection (sat, usd, eur) - separate from fiat input mode
     var activeMintUnit: String = "sat"
         private set
+
+    private var currentMintLimits: CashuWalletManager.MintLimits? = null
+
+    fun setMintLimits(limits: CashuWalletManager.MintLimits?) {
+        Log.d("AmountDisplayManager", "setMintLimits called with: $limits")
+        currentMintLimits = limits
+    }
+    
+    fun getCurrentMintLimits(): CashuWalletManager.MintLimits? {
+        return currentMintLimits
+    }
 
     enum class AnimationType { NONE, DIGIT_ENTRY, CURRENCY_SWITCH }
 
@@ -201,29 +216,42 @@ class AmountDisplayManager(
             }
         }
 
-        // Update submit button
-        if (satsValue > 0 || (isStablesatUnit() && currentInputStr.isNotEmpty())) {
-            // Always show a simple, localized "Charge" label without the amount
-            submitButton.text = context.getString(R.string.pos_charge_button)
-            submitButton.isEnabled = true
-            
+        // Update submit button (combine stablesat support with mint limits)
+        val hasInput = satsValue > 0 || (isStablesatUnit() && currentInputStr.isNotEmpty())
+        
+        if (hasInput) {
             // For Lightning payment: use the original amount in the selected unit
             // If stablesat (USD/EUR): use cents, if sat: use sats
             if (isStablesatUnit()) {
-                // Input is in cents for USD/EUR
                 originalAmount = currentInputStr.toLongOrNull() ?: 0L
-                // requestedAmount is used for display only (in sats)
                 requestedAmount = satsValue
             } else {
-                // Regular sat mode
                 originalAmount = satsValue
                 requestedAmount = satsValue
+            }
+            
+            // Check mint limits for satoshis
+            val limitCheck = MintLimitChecker.checkMintLimits(satsValue, currentMintLimits)
+            if (limitCheck.isValid) {
+                submitButton.text = context.getString(R.string.pos_charge_button)
+                submitButton.isEnabled = true
+            } else {
+                val buttonText = when (limitCheck.limitType) {
+                    MintLimitChecker.LimitType.MIN -> context.getString(R.string.pos_charge_button_min_limit, limitCheck.minAmount ?: 0)
+                    MintLimitChecker.LimitType.MAX -> context.getString(R.string.pos_charge_button_max_limit, limitCheck.maxAmount ?: 0)
+                    MintLimitChecker.LimitType.DISABLED -> context.getString(R.string.pos_charge_button_mint_disabled)
+                    else -> context.getString(R.string.pos_charge_button)
+                }
+                submitButton.text = buttonText
+                submitButton.isEnabled = false
+                submitButton.alpha = 0.5f
             }
         } else {
             requestedAmount = 0
             originalAmount = 0
             submitButton.text = context.getString(R.string.pos_charge_button)
             submitButton.isEnabled = false
+            submitButton.alpha = 0.5f
         }
     }
 

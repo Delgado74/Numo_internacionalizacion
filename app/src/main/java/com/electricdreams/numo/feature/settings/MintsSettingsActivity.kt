@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Intent
 import android.graphics.BitmapFactory
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import android.view.animation.DecelerateInterpolator
 import android.widget.FrameLayout
@@ -346,9 +347,14 @@ class MintsSettingsActivity : AppCompatActivity() {
     private fun setLightningMint(mintUrl: String, animate: Boolean) {
         selectedLightningMint = mintUrl
 
+        Log.d(TAG, "setLightningMint called with: $mintUrl")
+
         // Persist preference via MintManager so that payment flows (PaymentRequestActivity)
         // pick up the same Lightning mint when creating invoices.
         mintManager.setPreferredLightningMint(mintUrl)
+        
+        // Notify other activities (like POS) to reload mint info
+        BalanceRefreshBroadcast.send(this, BalanceRefreshBroadcast.REASON_LIGHTNING_MINT_CHANGED)
         
         // Update hero card
         updateLightningMintCard()
@@ -475,7 +481,10 @@ class MintsSettingsActivity : AppCompatActivity() {
             val added = mintManager.addMint(normalizedUrl)
             if (added) {
                 // Must await to ensure units are detected before returning
-                mintProfileService.fetchAndStoreMintProfile(normalizedUrl)
+                // Also store in cache for the new mint so it's ready when switching
+                withContext(Dispatchers.IO) {
+                    mintProfileService.fetchAndStoreMintProfile(normalizedUrl, storeInCache = true)
+                }
                 loadMintsAndBalances()
                 addMintCard.clearInput()
                 addMintCard.collapseIfExpanded()
@@ -498,7 +507,8 @@ class MintsSettingsActivity : AppCompatActivity() {
         lifecycleScope.launch {
             val mintsToRefresh = mintManager.getMintsNeedingRefresh()
             for (mintUrl in mintsToRefresh) {
-                mintProfileService.fetchAndStoreMintProfile(mintUrl)
+                // Don't store in cache - let POS handle cache when needed
+                mintProfileService.fetchAndStoreMintProfile(mintUrl, storeInCache = false)
             }
             if (mintsToRefresh.isNotEmpty()) {
                 updateLightningMintCard()
