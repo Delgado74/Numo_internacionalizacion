@@ -8,6 +8,7 @@ import androidx.appcompat.app.AppCompatActivity
 import com.electricdreams.numo.PaymentRequestActivity
 import com.electricdreams.numo.R
 import com.electricdreams.numo.core.util.MintManager
+import com.electricdreams.numo.core.util.P2PKKeyManager
 import com.electricdreams.numo.feature.tips.TipSelectionActivity
 import com.electricdreams.numo.feature.tips.TipsManager
 import com.electricdreams.numo.ndef.CashuPaymentHelper
@@ -46,7 +47,8 @@ class PaymentMethodHandler(
         val mintsForPaymentRequest =
             if (mintManager.isSwapFromUnknownMintsEnabled()) null else allowedMints
 
-        val paymentRequest = CashuPaymentHelper.createPaymentRequest(amount, "Payment of $amount sats", mintsForPaymentRequest)?.original
+        val p2pkPublicKey = P2PKKeyManager.getPublicKeyHex(activity)
+        val paymentRequest = CashuPaymentHelper.createPaymentRequest(amount, "Payment of $amount sats", mintsForPaymentRequest, p2pkPublicKey)?.original
             ?: run {
                 Toast.makeText(activity, R.string.payment_toast_failed_create_request, Toast.LENGTH_SHORT).show()
                 return

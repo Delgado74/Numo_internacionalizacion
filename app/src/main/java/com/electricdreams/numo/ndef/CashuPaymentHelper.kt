@@ -7,6 +7,7 @@ import com.google.gson.JsonObject
 import com.google.gson.JsonArray
 import com.electricdreams.numo.core.cashu.CashuWalletManager
 import com.electricdreams.numo.core.util.MintManager
+import com.electricdreams.numo.core.util.P2PKKeyManager
 import com.electricdreams.numo.payment.SwapToLightningMintManager
 import com.google.gson.*
 import kotlinx.coroutines.Dispatchers
@@ -71,6 +72,16 @@ object CashuPaymentHelper {
         description: String?,
         allowedMints: List<String>?,
     ): GeneratedPaymentRequest? {
+        return createPaymentRequest(amount, description, allowedMints, null)
+    }
+
+    @JvmStatic
+    fun createPaymentRequest(
+        amount: Long,
+        description: String?,
+        allowedMints: List<String>?,
+        p2pkPublicKey: String?,
+    ): GeneratedPaymentRequest? {
         return try {
             val map = com.upokecenter.cbor.CBORObject.NewMap()
             map.Add("i", java.util.UUID.randomUUID().toString().substring(0, 8))
@@ -83,10 +94,18 @@ object CashuPaymentHelper {
                 allowedMints.forEach { mintsArray.Add(it) }
                 map.Add("m", mintsArray)
             }
-            
+
+            if (p2pkPublicKey != null) {
+                val nut10Map = com.upokecenter.cbor.CBORObject.NewMap()
+                nut10Map.Add("k", "P2PK")
+                nut10Map.Add("d", p2pkPublicKey)
+                map.Add("nut10", nut10Map)
+                Log.d(TAG, "Added P2PK locking condition to PaymentRequest: $p2pkPublicKey")
+            }
+
             val cborBytes = map.EncodeToBytes()
             val encoded = "creqA" + android.util.Base64.encodeToString(cborBytes, android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP or android.util.Base64.NO_PADDING)
-            
+
             try {
                 val cdkRequest = org.cashudevkit.PaymentRequest.fromString(encoded)
                 val bech32 = cdkRequest.toBech32String()

@@ -33,6 +33,7 @@ import com.electricdreams.numo.core.data.model.PaymentHistoryEntry
 import com.electricdreams.numo.core.model.Amount
 import com.electricdreams.numo.core.model.Amount.Currency
 import com.electricdreams.numo.core.util.MintManager
+import com.electricdreams.numo.core.util.P2PKKeyManager
 import com.electricdreams.numo.core.util.SavedBasketManager
 import com.electricdreams.numo.core.worker.BitcoinPriceWorker
 import com.electricdreams.numo.core.util.CurrencyManager
@@ -574,10 +575,12 @@ class PaymentRequestActivity : AppCompatActivity() {
             val mintsForPaymentRequest =
                 if (mintManager.isSwapFromUnknownMintsEnabled()) null else allowedMints
 
+            val p2pkPublicKey = P2PKKeyManager.getPublicKeyHex(this)
             val generatedHce = CashuPaymentHelper.createPaymentRequest(
                 paymentAmount,
                 getString(R.string.payment_request_default_description, paymentAmount),
-                mintsForPaymentRequest
+                mintsForPaymentRequest,
+                p2pkPublicKey
             )
             hcePaymentRequest = generatedHce?.original
             hcePaymentRequestBech32 = generatedHce?.bech32
