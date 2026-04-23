@@ -21,6 +21,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.constraintlayout.widget.ConstraintLayout
 import com.electricdreams.numo.R
 import com.electricdreams.numo.core.cashu.CashuWalletManager
+import com.electricdreams.numo.core.model.Amount
 import com.electricdreams.numo.core.util.MintManager
 import com.electricdreams.numo.core.worker.BitcoinPriceWorker
 import com.electricdreams.numo.feature.history.PaymentsHistoryActivity
@@ -47,6 +48,9 @@ class PosUiCoordinator(
     private lateinit var switchCurrencyButton: View
     private lateinit var inputModeContainer: ConstraintLayout
     private lateinit var errorMessage: TextView
+    private var mintInfoContainer: View? = null
+    private var mintInfoName: TextView? = null
+    private var mintInfoBalance: TextView? = null
 
     // Input state
     private val satoshiInput = StringBuilder()
@@ -145,8 +149,11 @@ class PosUiCoordinator(
                 // Same behavior as onCreate - always set limits
                 amountDisplayManager.setMintLimits(limits)
                 
-                // Update display to re-evaluate button state based on new limits
+// Update display to re-evaluate button state based on new limits
                 amountDisplayManager.updateDisplay(satoshiInput, fiatInput, AmountDisplayManager.AnimationType.NONE)
+
+                // Update mint indicator
+                updateMintIndicator()
             }
         }
     }
@@ -262,7 +269,7 @@ class PosUiCoordinator(
         private val PATTERN_SUCCESS = longArrayOf(0, 50, 100, 50)
     }
 
-    private fun initializeViews() {
+private fun initializeViews() {
         amountDisplay = activity.findViewById(R.id.amount_display)
         secondaryAmountDisplay = activity.findViewById(R.id.secondary_amount_display)
         submitButton = activity.findViewById(R.id.submit_button)
@@ -270,8 +277,11 @@ class PosUiCoordinator(
         errorMessage = activity.findViewById(R.id.error_message)
         switchCurrencyButton = activity.findViewById(R.id.currency_switch_button)
         inputModeContainer = activity.findViewById(R.id.input_mode_container)
-        
-        // Initialize currency switch button translationY to 2dp
+
+        mintInfoContainer = activity.findViewById(R.id.mint_info_bar)
+        mintInfoName = activity.findViewById(R.id.mint_info_name)
+        mintInfoBalance = activity.findViewById(R.id.mint_info_balance)
+
         val iconOffsetPx = 2f * activity.resources.displayMetrics.density
         switchCurrencyButton.translationY = iconOffsetPx
     }
@@ -321,6 +331,30 @@ class PosUiCoordinator(
                 }
             }
         )
+
+        // Update mint indicator
+        updateMintIndicator()
+    }
+
+    private fun updateMintIndicator() {
+        if (mintInfoContainer == null || mintInfoName == null || mintInfoBalance == null) {
+            return
+        }
+
+        val mintUrl = mintManager.getPreferredLightningMint()
+        if (mintUrl == null) {
+            mintInfoContainer?.visibility = View.GONE
+            return
+        }
+
+        mintInfoContainer?.visibility = View.VISIBLE
+        val displayName = mintManager.getMintDisplayName(mintUrl)
+        mintInfoName?.text = displayName
+
+        activity.lifecycleScope.launch {
+            val balance = CashuWalletManager.getBalanceForMint(mintUrl)
+            mintInfoBalance?.text = Amount(balance, Amount.Currency.BTC).toString()
+        }
     }
 
     private fun setupNavigationButtons() {
