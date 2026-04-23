@@ -75,6 +75,7 @@ class LightningMintHandler(
 
     private var mintQuote: MintQuote? = null
     private var currentMintUrl: String? = null
+    private var currentCurrencyUnit: CurrencyUnit = CurrencyUnit.Sat
     private var mintJob: Job? = null
     
     /** Atomic flag to ensure mint is only called once (WebSocket vs polling race) */
@@ -104,8 +105,9 @@ class LightningMintHandler(
      *
      * @param paymentAmount Amount in satoshis to request
      * @param callback Callback for Lightning mint events
+     * @param activeUnit The active unit (sat, usd) for the mint - for stablesat support
      */
-    fun start(paymentAmount: Long, callback: Callback) {
+    fun start(paymentAmount: Long, callback: Callback, activeUnit: String = "sat") {
         val wallet = CashuWalletManager.getWallet()
         if (wallet == null) {
             Log.w(TAG, "WalletRepository not ready, skipping Lightning")
@@ -148,11 +150,18 @@ class LightningMintHandler(
         mintJob?.cancel()
         mintJob = uiScope.launch(ioDispatcher) {
             try {
-                // CDK Amount is in minor units of wallet's CurrencyUnit (we constructed wallet in sats)
+                // Determine CurrencyUnit based on activeUnit (for stablesat support)
+                currentCurrencyUnit = when (activeUnit.lowercase()) {
+                    "usd" -> CurrencyUnit.Usd
+                    "eur" -> CurrencyUnit.Eur
+                    else -> CurrencyUnit.Sat
+                }
+                
+                // CDK Amount is in minor units of wallet's CurrencyUnit
                 val quoteAmount = CdkAmount(paymentAmount.toULong())
 
-                Log.d(TAG, "Requesting Lightning mint quote from ${mintUrl.url} for $paymentAmount sats")
-                val mintWallet = wallet.getWallet(mintUrl, CurrencyUnit.Sat)
+                Log.d(TAG, "Requesting Lightning mint quote from ${mintUrl.url} for $paymentAmount in $activeUnit ($currentCurrencyUnit)")
+                val mintWallet = wallet.getWallet(mintUrl, currentCurrencyUnit)
 
                 val nut04 = mintWallet.loadMintInfo().nuts.nut04
                 val supportsDescription = nut04?.methods?.any {
@@ -497,7 +506,7 @@ class LightningMintHandler(
         }
 
         Log.d(TAG, "Mint quote $quoteId is paid (detected by $source), calling wallet.mint")
-        val mintWallet = wallet.getWallet(mintUrl, CurrencyUnit.Sat)
+        val mintWallet = wallet.getWallet(mintUrl, currentCurrencyUnit)
         val proofs = mintWallet?.mint(quoteId, org.cashudevkit.SplitTarget.None, null)
             ?: run {
                 Log.e(TAG, "Failed to get wallet for mint: ${mintUrl.url}")
@@ -544,7 +553,7 @@ class LightningMintHandler(
                 Log.v(TAG, "Polling mint quote state for $quoteId")
                 
                 // Check quote state using checkMintQuote API
-                val mintWallet = wallet.getWallet(mintUrl, CurrencyUnit.Sat)
+                val mintWallet = wallet.getWallet(mintUrl, currentCurrencyUnit)
                     ?: throw Exception("Failed to get wallet for mint: ${mintUrl.url}")
                 
                 val quote = mintWallet.checkMintQuote( quoteId)

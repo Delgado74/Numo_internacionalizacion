@@ -19,6 +19,7 @@ object PaymentRoutingCore {
             context: Context,
             amount: Long,
             formattedAmount: String,
+            activeUnit: String,
             checkoutBasketJson: String?
         ): Intent {
             val targetClass = when (targetActivity) {
@@ -28,6 +29,7 @@ object PaymentRoutingCore {
             return Intent(context, targetClass).apply {
                 putExtra(PaymentRequestActivity.EXTRA_PAYMENT_AMOUNT, amount)
                 putExtra(PaymentRequestActivity.EXTRA_FORMATTED_AMOUNT, formattedAmount)
+                putExtra(PaymentRequestActivity.EXTRA_ACTIVE_UNIT, activeUnit)
                 checkoutBasketJson?.let {
                     putExtra(PaymentRequestActivity.EXTRA_CHECKOUT_BASKET_JSON, it)
                 }

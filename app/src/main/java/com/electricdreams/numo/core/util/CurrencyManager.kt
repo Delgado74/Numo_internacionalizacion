@@ -54,6 +54,28 @@ class CurrencyManager private constructor(context: Context) {
                     JSONArray(response).getJSONObject(0).getDouble("trade_price")
                 }
             ),
+            // Yadio returns: rate = how many currency per 1 BTC (e.g., 71500 USD per BTC)
+            CURRENCY_USD to PriceApiConfig(
+                url = "https://api.yadio.io/rate/USD/BTC",
+                parsePrice = { response ->
+                    val rateStr = JSONObject(response).getString("rate")
+                    rateStr.toDoubleOrNull() ?: 0.0
+                }
+            ),
+            CURRENCY_EUR to PriceApiConfig(
+                url = "https://api.yadio.io/rate/EUR/BTC",
+                parsePrice = { response ->
+                    val rateStr = JSONObject(response).getString("rate")
+                    rateStr.toDoubleOrNull() ?: 0.0
+                }
+            ),
+            CURRENCY_GBP to PriceApiConfig(
+                url = "https://api.yadio.io/rate/GBP/BTC",
+                parsePrice = { response ->
+                    val rateStr = JSONObject(response).getString("rate")
+                    rateStr.toDoubleOrNull() ?: 0.0
+                }
+            ),
         )
 
         @Volatile

@@ -207,6 +207,35 @@
                     app:tint="@color/color_bg_white" />
             </LinearLayout>
 
+            <!-- Unit Selector for multi-unit mints (e.g., stablesat) - Single button like ElCaju -->
+            <LinearLayout
+                android:id="@+id/unit_selector_container"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:gravity="center"
+                android:orientation="horizontal"
+                android:visibility="gone"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@+id/secondary_amount_container">
+
+                <TextView
+                    android:id="@+id/unit_sat_selector"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:paddingHorizontal="24dp"
+                    android:paddingVertical="8dp"
+                    android:text="SAT"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/color_bg_white"
+                    android:background="@drawable/bg_unit_selector_active"
+                    android:clickable="true"
+                    android:focusable="true" />
+
+            </LinearLayout>
+
         </androidx.constraintlayout.widget.ConstraintLayout>
 
         <!-- Keypad with fixed height -->

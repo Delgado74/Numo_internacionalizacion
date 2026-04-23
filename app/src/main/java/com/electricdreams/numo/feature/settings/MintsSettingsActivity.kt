@@ -480,7 +480,8 @@ class MintsSettingsActivity : AppCompatActivity() {
 
             val added = mintManager.addMint(normalizedUrl)
             if (added) {
-                // Pre-load cache for the new mint so it's ready when switching
+                // Must await to ensure units are detected before returning
+                // Also store in cache for the new mint so it's ready when switching
                 withContext(Dispatchers.IO) {
                     mintProfileService.fetchAndStoreMintProfile(normalizedUrl, storeInCache = true)
                 }

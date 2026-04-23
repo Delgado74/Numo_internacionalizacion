@@ -942,6 +942,10 @@ class TipSelectionActivity : AppCompatActivity() {
             putExtra(EXTRA_TIP_PERCENTAGE, selectedTipPercentage)
             putExtra(EXTRA_BASE_AMOUNT_SATS, paymentAmountSats)
             putExtra(EXTRA_BASE_FORMATTED_AMOUNT, formattedAmount)
+            // Pass through the active unit (for stablesat support)
+            intent.getStringExtra(PaymentRequestActivity.EXTRA_ACTIVE_UNIT)?.let {
+                putExtra(PaymentRequestActivity.EXTRA_ACTIVE_UNIT, it)
+            }
             checkoutBasketJson?.let {
                 putExtra(PaymentRequestActivity.EXTRA_CHECKOUT_BASKET_JSON, it)
             }

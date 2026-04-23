@@ -23,6 +23,7 @@ import androidx.lifecycle.lifecycleScope
 import com.electricdreams.numo.R
 import com.electricdreams.numo.core.cashu.CashuWalletManager
 import com.electricdreams.numo.core.model.Amount
+import com.electricdreams.numo.core.prefs.PreferenceStore
 import com.electricdreams.numo.core.util.BalanceRefreshBroadcast
 import com.electricdreams.numo.core.util.MintIconCache
 import com.electricdreams.numo.core.util.MintManager
@@ -51,6 +52,7 @@ class MintDetailsActivity : AppCompatActivity() {
         const val EXTRA_DELETED = "deleted"
         const val EXTRA_SET_AS_LIGHTNING = "set_as_lightning"
         private const val TAG = "MintDetails"
+        private const val PREFERENCE_ACTIVE_UNIT_FOR_MINT_PREFIX = "active_unit_for_mint_"
     }
 
     // Header views
@@ -63,6 +65,7 @@ class MintDetailsActivity : AppCompatActivity() {
     private lateinit var mintName: TextView
     private lateinit var mintUrlText: TextView
     private lateinit var balanceText: TextView
+    private lateinit var balanceUsdText: TextView
     private lateinit var lightningBadge: LinearLayout
 
     // Content sections
@@ -89,6 +92,11 @@ class MintDetailsActivity : AppCompatActivity() {
     private lateinit var actionDivider1: View
     private lateinit var copyUrlButton: LinearLayout
     private lateinit var deleteButton: LinearLayout
+
+    // Unit selector
+    private lateinit var unitSelectorSection: LinearLayout
+    private lateinit var unitSatButton: TextView
+    private lateinit var unitUsdButton: TextView
 
     // State
     private lateinit var mintManager: MintManager
@@ -160,6 +168,7 @@ class MintDetailsActivity : AppCompatActivity() {
         mintName = findViewById(R.id.mint_name)
         mintUrlText = findViewById(R.id.mint_url)
         balanceText = findViewById(R.id.balance_text)
+        balanceUsdText = findViewById(R.id.balance_usd_text)
         lightningBadge = findViewById(R.id.lightning_badge)
         
         descriptionSection = findViewById(R.id.description_section)
@@ -183,6 +192,11 @@ class MintDetailsActivity : AppCompatActivity() {
         actionDivider1 = findViewById(R.id.action_divider_1)
         copyUrlButton = findViewById(R.id.copy_url_button)
         deleteButton = findViewById(R.id.delete_button)
+
+        // Unit selector
+        unitSelectorSection = findViewById(R.id.unit_selector_section)
+        unitSatButton = findViewById(R.id.unit_sat_button)
+        unitUsdButton = findViewById(R.id.unit_usd_button)
     }
 
     private fun setupListeners() {
@@ -237,11 +251,80 @@ class MintDetailsActivity : AppCompatActivity() {
         // Load balance
         loadBalance()
         
+        // Load unit selector (for mints with multiple units like stablesat)
+        loadUnitSelector()
+        
         // Load cached mint info first (instant)
         loadCachedMintInfo()
         
         // Then refresh from network (async)
         refreshMintInfo()
+    }
+
+    private fun loadUnitSelector() {
+        val supportedUnits = mintManager.getSupportedUnits(mintUrl)
+        Log.d(TAG, "loadUnitSelector: mintUrl=$mintUrl, supportedUnits=$supportedUnits")
+        
+        if (supportedUnits != null && supportedUnits.size > 1) {
+            unitSelectorSection.visibility = View.VISIBLE
+            
+            // Get current active unit from preferences
+            val prefs = PreferenceStore.app(this)
+            val activeUnit = prefs.getString(PREFERENCE_ACTIVE_UNIT_FOR_MINT_PREFIX + mintUrl, "sat") ?: "sat"
+            Log.d(TAG, "loadUnitSelector: activeUnit=$activeUnit")
+            
+            updateUnitButtons(activeUnit, supportedUnits)
+            
+            // Setup click listeners
+            unitSatButton.setOnClickListener {
+                setActiveUnit("sat")
+            }
+            
+            unitUsdButton.setOnClickListener {
+                setActiveUnit("usd")
+            }
+        } else {
+            Log.d(TAG, "loadUnitSelector: hiding unit selector (units: $supportedUnits)")
+            unitSelectorSection.visibility = View.GONE
+        }
+    }
+
+    private fun setActiveUnit(unit: String) {
+        val prefs = PreferenceStore.app(this)
+        prefs.putString(PREFERENCE_ACTIVE_UNIT_FOR_MINT_PREFIX + mintUrl, unit)
+        
+        val supportedUnits = mintManager.getSupportedUnits(mintUrl) ?: listOf("sat")
+        updateUnitButtons(unit, supportedUnits)
+        
+        Toast.makeText(this, "Active unit: $unit", Toast.LENGTH_SHORT).show()
+        
+        // Broadcast balance refresh to update POS display
+        BalanceRefreshBroadcast.send(this)
+    }
+
+    private fun updateUnitButtons(activeUnit: String, supportedUnits: List<String>) {
+        // Update sat button
+        if (activeUnit == "sat") {
+            unitSatButton.setBackgroundResource(R.drawable.bg_input_pill)
+            unitSatButton.setTextColor(getColor(R.color.color_text_primary))
+        } else {
+            unitSatButton.setBackgroundResource(R.drawable.bg_input_pill_outlined)
+            unitSatButton.setTextColor(getColor(R.color.color_text_tertiary))
+        }
+        
+        // Update USD button (only if supported)
+        if (supportedUnits.contains("usd")) {
+            unitUsdButton.visibility = View.VISIBLE
+            if (activeUnit == "usd") {
+                unitUsdButton.setBackgroundResource(R.drawable.bg_input_pill)
+                unitUsdButton.setTextColor(getColor(R.color.color_text_primary))
+            } else {
+                unitUsdButton.setBackgroundResource(R.drawable.bg_input_pill_outlined)
+                unitUsdButton.setTextColor(getColor(R.color.color_text_tertiary))
+            }
+        } else {
+            unitUsdButton.visibility = View.GONE
+        }
     }
 
     private fun updateLightningBadge() {
@@ -277,11 +360,22 @@ class MintDetailsActivity : AppCompatActivity() {
 
     private fun loadBalance() {
         lifecycleScope.launch {
-            val balances = withContext(Dispatchers.IO) {
-                CashuWalletManager.getAllMintBalances()
+            val balancesByUnit = withContext(Dispatchers.IO) {
+                CashuWalletManager.getAllMintBalancesByUnit()
             }
-            val balance = balances[mintUrl] ?: 0L
-            balanceText.text = Amount(balance, Amount.Currency.BTC).toString()
+            
+            val mintBalances = balancesByUnit[mintUrl]
+            val satBalance = mintBalances?.get("sat") ?: 0L
+            val usdBalance = mintBalances?.get("usd") ?: 0L
+            
+            balanceText.text = Amount(satBalance, Amount.Currency.BTC).toString()
+            
+            if (usdBalance > 0) {
+                balanceUsdText.visibility = View.VISIBLE
+                balanceUsdText.text = "$${usdBalance / 100.0}"
+            } else {
+                balanceUsdText.visibility = View.GONE
+            }
         }
     }
 
@@ -420,12 +514,36 @@ class MintDetailsActivity : AppCompatActivity() {
                     loadCachedMintInfo()
                     hideError()
                     loadMintIcon()
+                    
+                    // Try to detect supported units from refreshed mint info
+                    detectAndStoreSupportedUnits()
+                    
+                    // Reload unit selector with new units
+                    loadUnitSelector()
                 } else {
                     showError()
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to fetch mint info: ${e.message}")
                 showError()
+            }
+        }
+    }
+
+    private fun detectAndStoreSupportedUnits() {
+        lifecycleScope.launch {
+            try {
+                val mintInfo = withContext(Dispatchers.IO) {
+                    CashuWalletManager.fetchMintInfo(mintUrl)
+                }
+                
+                if (mintInfo != null) {
+                    val units = CashuWalletManager.getSupportedUnits(mintInfo)
+                    mintManager.setSupportedUnits(mintUrl, units)
+                    Log.d(TAG, "Detected supported units for $mintUrl: $units")
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to detect supported units: ${e.message}")
             }
         }
     }

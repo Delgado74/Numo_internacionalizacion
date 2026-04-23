@@ -33,6 +33,14 @@ class AmountDisplayManager(
         private set
     var requestedAmount: Long = 0
         private set
+    
+    // Original amount in the selected unit (for stablesat: cents, for sat: sats)
+    var originalAmount: Long = 0
+        private set
+    
+    // Unit from mint selection (sat, usd, eur) - separate from fiat input mode
+    var activeMintUnit: String = "sat"
+        private set
 
     private var currentMintLimits: CashuWalletManager.MintLimits? = null
 
@@ -62,6 +70,17 @@ class AmountDisplayManager(
             }
         }
         return true
+    }
+    
+    /** Set the active mint unit (sat, usd, eur) from mint selection */
+    fun setActiveMintUnit(unit: String) {
+        activeMintUnit = unit.lowercase()
+        Log.d("AmountDisplayManager", "Set active mint unit: $activeMintUnit")
+    }
+    
+    /** Check if current active unit is a fiat unit (stablesat USD/EUR) */
+    fun isStablesatUnit(): Boolean {
+        return activeMintUnit == "usd" || activeMintUnit == "eur"
     }
 
     /** Toggle between USD and Satoshi input modes */
@@ -123,27 +142,42 @@ class AmountDisplayManager(
         
         // Check if we have Bitcoin price data
         val hasBitcoinPrice = (bitcoinPriceWorker?.getCurrentPrice() ?: 0.0) > 0
+        
+        // Determine if we should treat input as fiat (either USD input mode OR active mint unit is USD/EUR)
+        val isFiatInput = isUsdInputMode || isStablesatUnit()
 
-        if (isUsdInputMode) {
-            // Input mode: fiat, display fiat as primary, sats as secondary
+        if (isFiatInput) {
+            // Input mode: fiat (either from toggle or from mint's stablesat unit)
             val currencyCode = CurrencyManager.getInstance(context).getCurrentCurrency()
             val currency = Amount.Currency.fromCode(currencyCode)
             
             val rawInput = if (currentInputStr.isEmpty()) 0L else currentInputStr.toLong()
             
-            val fiatCents = if (currency.isZeroDecimal()) {
-                rawInput * 100
+            if (isUsdInputMode) {
+                // Regular fiat input mode (user toggled to fiat)
+                val fiatCents = if (currency.isZeroDecimal()) {
+                    rawInput * 100
+                } else {
+                    rawInput
+                }
+                amountDisplayText = Amount(fiatCents, currency).toString()
+                amountDisplayText = if (amountDisplayText.length > 9) Amount(fiatCents, currency).toShortString() else amountDisplayText
+                val fiatAmount = fiatCents / 100.0
+                satsValue = fiatToSatoshis(fiatAmount)
             } else {
-                rawInput
+                // Stablesat mode: input is in cents (like regular fiat mode)
+                // User types: 1 → $0.01, 100 → $1.00
+                val fiatCents = rawInput  // Input is in cents: "1" = 1 cent = $0.01
+                val fiatAmount = fiatCents / 100.0  // Convert to dollars for calculation
+                satsValue = fiatToSatoshis(fiatAmount)
+                
+                // Format display as fiat (with 2 decimals)
+                amountDisplayText = "$${String.format("%.2f", fiatAmount)}"
             }
             
-            amountDisplayText = Amount(fiatCents, currency).toString()
-            amountDisplayText = if (amountDisplayText.length > 9) Amount(fiatCents, currency).toShortString() else amountDisplayText
-            
-            // Convert fiat to satoshis for secondary display and requestedAmount
-            val fiatAmount = fiatCents / 100.0
-            satsValue = fiatToSatoshis(fiatAmount)
-            secondaryDisplayText = Amount(satsValue, Amount.Currency.BTC).toShortString()
+            // Secondary display always shows sats equivalent
+            Log.d("AmountDisplayManager", "isFiatInput=$isFiatInput, isStablesatUnit=${isStablesatUnit()}, satsValue=$satsValue, price=${bitcoinPriceWorker?.getCurrentPrice()}")
+            secondaryDisplayText = Amount(satsValue, Amount.Currency.BTC).toString()
         } else {
             // Input mode: satoshi, display sats as primary, fiat as secondary
             satsValue = if (currentInputStr.isEmpty()) 0L else currentInputStr.toLong()
@@ -182,42 +216,40 @@ class AmountDisplayManager(
             }
         }
 
-        // Update submit button
-        if (satsValue > 0) {
-            requestedAmount = satsValue
-            val isReady = CashuWalletManager.walletState.value == com.electricdreams.numo.core.cashu.WalletState.READY
-            val isNetworkAvailable = NetworkUtils.isNetworkAvailable(context)
-            if (isReady) {
-                val limitCheck = MintLimitChecker.checkMintLimits(satsValue, currentMintLimits)
-                if (limitCheck.isValid) {
-                    submitButton.text = context.getString(R.string.pos_charge_button)
-                    submitButton.isEnabled = isNetworkAvailable
-                    submitButton.alpha = if (isNetworkAvailable) 1.0f else 0.5f
-                } else {
-                    val buttonText = when (limitCheck.limitType) {
-                        MintLimitChecker.LimitType.MIN -> context.getString(R.string.pos_charge_button_min_limit, limitCheck.minAmount ?: 0)
-                        MintLimitChecker.LimitType.MAX -> context.getString(R.string.pos_charge_button_max_limit, limitCheck.maxAmount ?: 0)
-                        MintLimitChecker.LimitType.DISABLED -> context.getString(R.string.pos_charge_button_mint_disabled)
-                        else -> context.getString(R.string.pos_charge_button)
-                    }
-                    submitButton.text = buttonText
-                    submitButton.isEnabled = false
-                    submitButton.alpha = 0.5f
-                }
+        // Update submit button (combine stablesat support with mint limits)
+        val hasInput = satsValue > 0 || (isStablesatUnit() && currentInputStr.isNotEmpty())
+        
+        if (hasInput) {
+            // For Lightning payment: use the original amount in the selected unit
+            // If stablesat (USD/EUR): use cents, if sat: use sats
+            if (isStablesatUnit()) {
+                originalAmount = currentInputStr.toLongOrNull() ?: 0L
+                requestedAmount = satsValue
             } else {
-                submitButton.text = context.getString(R.string.pos_charge_button_loading)
+                originalAmount = satsValue
+                requestedAmount = satsValue
+            }
+            
+            // Check mint limits for satoshis
+            val limitCheck = MintLimitChecker.checkMintLimits(satsValue, currentMintLimits)
+            if (limitCheck.isValid) {
+                submitButton.text = context.getString(R.string.pos_charge_button)
+                submitButton.isEnabled = true
+            } else {
+                val buttonText = when (limitCheck.limitType) {
+                    MintLimitChecker.LimitType.MIN -> context.getString(R.string.pos_charge_button_min_limit, limitCheck.minAmount ?: 0)
+                    MintLimitChecker.LimitType.MAX -> context.getString(R.string.pos_charge_button_max_limit, limitCheck.maxAmount ?: 0)
+                    MintLimitChecker.LimitType.DISABLED -> context.getString(R.string.pos_charge_button_mint_disabled)
+                    else -> context.getString(R.string.pos_charge_button)
+                }
+                submitButton.text = buttonText
                 submitButton.isEnabled = false
                 submitButton.alpha = 0.5f
             }
         } else {
             requestedAmount = 0
-            val isReady = CashuWalletManager.walletState.value == com.electricdreams.numo.core.cashu.WalletState.READY
-            val isNetworkAvailable = NetworkUtils.isNetworkAvailable(context)
-            if (isReady) {
-                submitButton.text = context.getString(R.string.pos_charge_button)
-            } else {
-                submitButton.text = context.getString(R.string.pos_charge_button_loading)
-            }
+            originalAmount = 0
+            submitButton.text = context.getString(R.string.pos_charge_button)
             submitButton.isEnabled = false
             submitButton.alpha = 0.5f
         }
@@ -248,6 +280,38 @@ class AmountDisplayManager(
 
     /** Convert fiat amount (in currency units, not cents) to satoshis */
     private fun fiatToSatoshis(fiatAmount: Double): Long {
+        Log.d("AmountDisplayManager", "fiatToSatoshis: amount=$fiatAmount, isStablesat=${isStablesatUnit()}")
+        
+        // For stablesat (active mint unit is USD/EUR):
+        if (isStablesatUnit()) {
+            // Try to get USD price first
+            var usdPrice = bitcoinPriceWorker?.getBtcUsdPrice() ?: 0.0
+            Log.d("AmountDisplayManager", "getBtcUsdPrice: $usdPrice")
+            
+            // If no USD price, try current price (might be EUR, GBP, etc)
+            if (usdPrice <= 0) {
+                usdPrice = bitcoinPriceWorker?.getCurrentPrice() ?: 0.0
+                Log.d("AmountDisplayManager", "getCurrentPrice: $usdPrice")
+            }
+            
+            // Log the currency being used
+            val currency = try {
+                val cm = CurrencyManager.getInstance(context)
+                cm.getCurrentCurrency()
+            } catch (e: Exception) { "unknown" }
+            Log.d("AmountDisplayManager", "Current currency from CurrencyManager: $currency")
+            
+            if (usdPrice > 0) {
+                Log.d("AmountDisplayManager", "Converting: $fiatAmount / $usdPrice * 100000000")
+                val btcAmount = fiatAmount / usdPrice
+                return (btcAmount * 100_000_000).toLong()
+            } else {
+                Log.d("AmountDisplayManager", "No price - returning 0 (payment uses USD)")
+                return 0L
+            }
+        }
+        
+        // For regular fiat input mode
         val price = bitcoinPriceWorker?.getCurrentPrice() ?: 0.0
         if (price <= 0) return 0L
         

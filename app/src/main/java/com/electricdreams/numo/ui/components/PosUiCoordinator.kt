@@ -21,7 +21,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.constraintlayout.widget.ConstraintLayout
 import com.electricdreams.numo.R
 import com.electricdreams.numo.core.cashu.CashuWalletManager
-import com.electricdreams.numo.core.model.Amount
+import com.electricdreams.numo.core.prefs.PreferenceStore
 import com.electricdreams.numo.core.util.MintManager
 import com.electricdreams.numo.core.worker.BitcoinPriceWorker
 import com.electricdreams.numo.feature.history.PaymentsHistoryActivity
@@ -48,14 +48,22 @@ class PosUiCoordinator(
     private lateinit var switchCurrencyButton: View
     private lateinit var inputModeContainer: ConstraintLayout
     private lateinit var errorMessage: TextView
-    private var mintInfoContainer: View? = null
-    private var mintInfoName: TextView? = null
-    private var mintInfoBalance: TextView? = null
+    private lateinit var unitSelectorContainer: View
+    
+    companion object {
+        private const val TAG = "PosUiCoordinator"
+        private const val KEY_INPUT_MODE = "pos_input_mode"
+        private val PATTERN_SUCCESS = longArrayOf(0, 50, 100, 50)
+    }
 
     // Input state
     private val satoshiInput = StringBuilder()
     private val fiatInput = StringBuilder()
     private val mainHandler = Handler(Looper.getMainLooper())
+    private var activeUnit: String = "sat"
+    
+    // Single button for unit selector (like ElCaju)
+    private lateinit var unitToggleButton: TextView
 
     // Manager instances
     private lateinit var amountDisplayManager: AmountDisplayManager
@@ -70,6 +78,11 @@ class PosUiCoordinator(
     fun initialize() {
         initializeViews()
         initializeManagers()
+        
+        // Load active unit preference and setup unit selector (after managers are initialized)
+        loadActiveUnit()
+        setupUnitSelector()
+        
         setupNavigationButtons()
         
         // Disable charge button initially, enable when wallet is ready
@@ -149,11 +162,8 @@ class PosUiCoordinator(
                 // Same behavior as onCreate - always set limits
                 amountDisplayManager.setMintLimits(limits)
                 
-// Update display to re-evaluate button state based on new limits
+                // Update display to re-evaluate button state based on new limits
                 amountDisplayManager.updateDisplay(satoshiInput, fiatInput, AmountDisplayManager.AnimationType.NONE)
-
-                // Update mint indicator
-                updateMintIndicator()
             }
         }
     }
@@ -173,7 +183,11 @@ class PosUiCoordinator(
                     Log.d("PosUiCoordinator", "Auto-initiating payment flow for basket checkout with amount: $paymentAmount")
                     showChargeButtonSpinner()
                     val formattedAmount = amountDisplay.text.toString()
-                    paymentMethodHandler.showPaymentMethodDialog(amountDisplayManager.requestedAmount, formattedAmount)
+                    paymentMethodHandler.showPaymentMethodDialog(
+                        amountDisplayManager.requestedAmount, 
+                        formattedAmount,
+                        activeUnit
+                    )
                 }
             }, 500)
         } else {
@@ -211,6 +225,14 @@ class PosUiCoordinator(
     fun refreshDisplay() {
         // Force a display update to reflect any currency changes
         amountDisplayManager.updateDisplay(satoshiInput, fiatInput, AmountDisplayManager.AnimationType.NONE)
+        
+        // Also refresh unit toggle button
+        updateUnitToggleButton()
+    }
+
+    /** Reload active unit from preferences (called when returning to POS) */
+    fun reloadActiveUnit() {
+        loadActiveUnit()
     }
 
     /** Handle NFC payment */
@@ -264,12 +286,7 @@ class PosUiCoordinator(
     /** Get requested amount */
     fun getRequestedAmount(): Long = amountDisplayManager.requestedAmount
 
-    companion object {
-        private const val TAG = "PosUiCoordinator"
-        private val PATTERN_SUCCESS = longArrayOf(0, 50, 100, 50)
-    }
-
-private fun initializeViews() {
+    private fun initializeViews() {
         amountDisplay = activity.findViewById(R.id.amount_display)
         secondaryAmountDisplay = activity.findViewById(R.id.secondary_amount_display)
         submitButton = activity.findViewById(R.id.submit_button)
@@ -277,13 +294,92 @@ private fun initializeViews() {
         errorMessage = activity.findViewById(R.id.error_message)
         switchCurrencyButton = activity.findViewById(R.id.currency_switch_button)
         inputModeContainer = activity.findViewById(R.id.input_mode_container)
-
-        mintInfoContainer = activity.findViewById(R.id.mint_info_bar)
-        mintInfoName = activity.findViewById(R.id.mint_info_name)
-        mintInfoBalance = activity.findViewById(R.id.mint_info_balance)
-
+        
+        // Unit selector for multi-unit mints (single button like ElCaju)
+        unitToggleButton = activity.findViewById(R.id.unit_sat_selector)
+        
+        // Unit selector container for visibility
+        unitSelectorContainer = activity.findViewById(R.id.unit_selector_container)
+        
+        // Initialize currency switch button translationY to 2dp
         val iconOffsetPx = 2f * activity.resources.displayMetrics.density
         switchCurrencyButton.translationY = iconOffsetPx
+    }
+
+    private fun loadActiveUnit() {
+        val mintManager = MintManager.getInstance(activity)
+        val preferredMint = mintManager.getPreferredLightningMint()
+        
+        if (preferredMint == null) {
+            Log.d("PosUiCoordinator", "No preferred lightning mint set, defaulting to sat")
+            activeUnit = "sat"
+            return
+        }
+        
+        val prefs = PreferenceStore.app(activity)
+        activeUnit = prefs.getString("active_unit_for_mint_$preferredMint", "sat") ?: "sat"
+        
+        Log.d("PosUiCoordinator", "loadActiveUnit: activeUnit=$activeUnit")
+        
+        amountDisplayManager.setActiveMintUnit(activeUnit)
+        
+        updateUnitToggleButton()
+    }
+
+    private fun setupUnitSelector() {
+        // Single button that cycles through units (like ElCaju)
+        unitToggleButton.setOnClickListener {
+            cycleActiveUnit()
+        }
+    }
+    
+    private fun cycleActiveUnit() {
+        val mintManager = MintManager.getInstance(activity)
+        val preferredMint = mintManager.getPreferredLightningMint() ?: return
+        
+        val units = mintManager.getSupportedUnits(preferredMint) ?: listOf("sat")
+        if (units.size <= 1) return
+        
+        val currentIndex = units.indexOf(activeUnit)
+        val nextIndex = (currentIndex + 1) % units.size
+        val newUnit = units[nextIndex]
+        
+        Log.d("PosUiCoordinator", "cycleActiveUnit: $activeUnit -> $newUnit")
+        
+        activeUnit = newUnit
+        
+        val prefs = PreferenceStore.app(activity)
+        prefs.putString("active_unit_for_mint_$preferredMint", newUnit)
+        
+        amountDisplayManager.setActiveMintUnit(newUnit)
+        
+        updateUnitToggleButton()
+        
+        amountDisplayManager.updateDisplay(satoshiInput, fiatInput, AmountDisplayManager.AnimationType.NONE)
+    }
+    
+    private fun updateUnitToggleButton() {
+        val mintManager = MintManager.getInstance(activity)
+        val preferredMint = mintManager.getPreferredLightningMint()
+        
+        if (preferredMint != null && mintManager.hasMultipleUnits(preferredMint)) {
+            unitSelectorContainer.visibility = View.VISIBLE
+            
+            // Show current unit in button text
+            val displayText = if (activeUnit == "sat") "SAT" else "USD"
+            unitToggleButton.text = displayText
+            
+            // Button style based on unit (filled or outlined)
+            if (activeUnit == "sat") {
+                unitToggleButton.setBackgroundResource(R.drawable.bg_unit_selector_active)
+            } else {
+                unitToggleButton.setBackgroundResource(R.drawable.bg_unit_selector_inactive)
+            }
+            
+            Log.d("PosUiCoordinator", "updateUnitToggleButton: activeUnit=$activeUnit, displayText=$displayText")
+        } else {
+            unitSelectorContainer.visibility = View.GONE
+        }
     }
 
     private fun initializeManagers() {
@@ -331,30 +427,6 @@ private fun initializeViews() {
                 }
             }
         )
-
-        // Update mint indicator
-        updateMintIndicator()
-    }
-
-    private fun updateMintIndicator() {
-        if (mintInfoContainer == null || mintInfoName == null || mintInfoBalance == null) {
-            return
-        }
-
-        val mintUrl = mintManager.getPreferredLightningMint()
-        if (mintUrl == null) {
-            mintInfoContainer?.visibility = View.GONE
-            return
-        }
-
-        mintInfoContainer?.visibility = View.VISIBLE
-        val displayName = mintManager.getMintDisplayName(mintUrl)
-        mintInfoName?.text = displayName
-
-        activity.lifecycleScope.launch {
-            val balance = CashuWalletManager.getBalanceForMint(mintUrl)
-            mintInfoBalance?.text = Amount(balance, Amount.Currency.BTC).toString()
-        }
     }
 
     private fun setupNavigationButtons() {
@@ -402,10 +474,25 @@ private fun initializeViews() {
             }
 
             if (amountDisplayManager.requestedAmount > 0) {
+                Log.d("PosUiCoordinator", "Charge clicked: requestedAmount=${amountDisplayManager.requestedAmount}, originalAmount=${amountDisplayManager.originalAmount}, activeUnit=$activeUnit, isStablesat=${amountDisplayManager.isStablesatUnit()}")
                 showChargeButtonSpinner()
                 val formattedAmount = amountDisplay.text.toString()
-                paymentMethodHandler.showPaymentMethodDialog(amountDisplayManager.requestedAmount, formattedAmount)
+                
+                // Use originalAmount for PaymentRequest when in USD mode, requestedAmount for SAT
+                val paymentAmount = if (activeUnit == "usd" || activeUnit == "eur") {
+                    amountDisplayManager.originalAmount
+                } else {
+                    amountDisplayManager.requestedAmount
+                }
+                
+                Log.d("PosUiCoordinator", "Calling showPaymentMethodDialog: amount=$paymentAmount, activeUnit=$activeUnit")
+                paymentMethodHandler.showPaymentMethodDialog(
+                    paymentAmount, 
+                    formattedAmount,
+                    activeUnit
+                )
             } else {
+                Log.d("PosUiCoordinator", "Charge clicked but requestedAmount=0, activeUnit=$activeUnit, isStablesat=${amountDisplayManager.isStablesatUnit()}")
                 showAmountRequiredError()
             }
         }
