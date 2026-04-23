@@ -153,6 +153,10 @@ class PaymentRequestActivity : AppCompatActivity() {
     private var currentOverlayActionMode: OverlayActionMode = OverlayActionMode.SUCCESS
     private var isProcessingNfcPayment = false
 
+    private var hcePaymentCallback: NdefHostCardEmulationService.CashuPaymentCallback? = null
+    private var nfcSetupRunnable: Runnable? = null
+    private val nfcSetupHandler = Handler(Looper.getMainLooper())
+
     private val uiScope = CoroutineScope(Dispatchers.Main)
 
     // NFC animation timing diagnostics
@@ -526,9 +530,18 @@ class PaymentRequestActivity : AppCompatActivity() {
         } catch (e: Exception) {
             Log.e(TAG, "Failed to set preferred HCE service: ${e.message}", e)
         }
+        
+        // Re-start and re-setup HCE service in case it was killed while backgrounded
+        val ndefAvailable = NdefHostCardEmulationService.isHceAvailable(this)
+        if (ndefAvailable && hcePaymentRequest != null) {
+            val serviceIntent = Intent(this, NdefHostCardEmulationService::class.java)
+            startService(serviceIntent)
+            setupNdefPayment()
+        }
     }
 
     override fun onPause() {
+        nfcSetupRunnable?.let { nfcSetupHandler.removeCallbacks(it) }
         try {
             val nfcAdapter = NfcAdapter.getDefaultAdapter(this)
             if (nfcAdapter != null) {
@@ -587,11 +600,7 @@ class PaymentRequestActivity : AppCompatActivity() {
                 Toast.makeText(this, R.string.payment_request_error_ndef_prepare, Toast.LENGTH_SHORT).show()
             } else {
                 Log.d(TAG, "Created HCE payment request: $hcePaymentRequest")
-
-                // Start HCE service in the background
-                val serviceIntent = Intent(this, NdefHostCardEmulationService::class.java)
-                startService(serviceIntent)
-                setupNdefPayment()
+                // HCE service will be started and configured in onResume()
             }
         }
 
@@ -857,7 +866,7 @@ class PaymentRequestActivity : AppCompatActivity() {
         val request = hcePaymentRequest ?: return
 
         // Match original behavior: slight delay before configuring service
-        Handler(Looper.getMainLooper()).postDelayed({
+        nfcSetupRunnable = Runnable {
             val hceService = NdefHostCardEmulationService.getInstance()
             if (hceService != null) {
                 Log.d(TAG, "Setting up NDEF payment with HCE service")
@@ -880,7 +889,7 @@ class PaymentRequestActivity : AppCompatActivity() {
                 }
 
                 // Set up callback for when a token is received or an error occurs
-                hceService.setPaymentCallback(object : NdefHostCardEmulationService.CashuPaymentCallback {
+                hcePaymentCallback = object : NdefHostCardEmulationService.CashuPaymentCallback {
                     override fun onCashuTokenReceived(token: String) {
                         // Raw Cashu token received over NFC. Delegate full
                         // validation, swap-to-Lightning-mint (if needed),
@@ -988,11 +997,13 @@ class PaymentRequestActivity : AppCompatActivity() {
                             }
                         }
                     }
-                })
+                }
+                hceService.setPaymentCallback(hcePaymentCallback)
 
                 Log.d(TAG, "NDEF payment service ready")
             }
-        }, 1000)
+        }
+        nfcSetupRunnable?.let { nfcSetupHandler.postDelayed(it, 1000) }
     }
 
     private fun handlePaymentSuccess(token: String) {
@@ -1157,6 +1168,9 @@ class PaymentRequestActivity : AppCompatActivity() {
         // a safety net for any paths that might reach cleanup without having
         // called [beginTerminalOutcome] explicitly.
         hasTerminalOutcome = true
+
+        nfcSetupRunnable?.let { nfcSetupHandler.removeCallbacks(it) }
+
         cancelNfcSafetyTimeout()
 
         // Stop Nostr handler
@@ -1170,10 +1184,12 @@ class PaymentRequestActivity : AppCompatActivity() {
         // Clean up HCE service
         try {
             val hceService = NdefHostCardEmulationService.getInstance()
-            if (hceService != null) {
-                Log.d(TAG, "Cleaning up HCE service")
-                hceService.clearPaymentRequest()
-                hceService.setPaymentCallback(null)
+            if (hceService != null && hcePaymentCallback != null) {
+                if (hceService.paymentCallback === hcePaymentCallback) {
+                    Log.d(TAG, "Cleaning up HCE service")
+                    hceService.clearPaymentRequest()
+                    hceService.setPaymentCallback(null)
+                }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error cleaning up HCE service: ${e.message}", e)
@@ -1189,6 +1205,7 @@ class PaymentRequestActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        nfcSetupRunnable?.let { nfcSetupHandler.removeCallbacks(it) }
         cancelNfcSafetyTimeout()
         nostrHandler?.stop()
         nostrHandler = null
@@ -1198,8 +1215,10 @@ class PaymentRequestActivity : AppCompatActivity() {
         try {
             val hceService = NdefHostCardEmulationService.getInstance()
             if (hceService != null) {
-                hceService.clearPaymentRequest()
-                hceService.setPaymentCallback(null)
+                if (isFinishing || (hcePaymentCallback != null && hceService.paymentCallback === hcePaymentCallback)) {
+                    hceService.clearPaymentRequest()
+                    hceService.setPaymentCallback(null)
+                }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error cleaning up HCE service in onDestroy: ${e.message}", e)
@@ -1367,10 +1386,12 @@ class PaymentRequestActivity : AppCompatActivity() {
         // Clean up HCE service
         try {
             val hceService = NdefHostCardEmulationService.getInstance()
-            if (hceService != null) {
-                Log.d(TAG, "Cleaning up HCE service")
-                hceService.clearPaymentRequest()
-                hceService.setPaymentCallback(null)
+            if (hceService != null && hcePaymentCallback != null) {
+                if (hceService.paymentCallback === hcePaymentCallback) {
+                    Log.d(TAG, "Cleaning up HCE service")
+                    hceService.clearPaymentRequest()
+                    hceService.setPaymentCallback(null)
+                }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error cleaning up HCE service: ${e.message}", e)
