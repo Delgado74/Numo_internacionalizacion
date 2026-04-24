@@ -108,7 +108,7 @@
     
     <string name="onboarding_welcome_tagline">Accept Bitcoin payments instantly with zero fees.</string>
     <string name="onboarding_welcome_message">Accept Bitcoin payments instantly with zero fees using Cashu ecash technology.</string>
-    <string name="onboarding_terms_text">By continuing, you agree to our Terms of Service and Privacy Policy</string>
+    <string name="onboarding_terms_text">By continuing, you agree to our <annotation id="terms">Terms of Service</annotation> and <annotation id="privacy">Privacy Policy</annotation></string>
     <string name="onboarding_get_started">Get Started</string>
 
     
@@ -581,6 +581,8 @@
     <string name="item_selection_charge_button">Charge</string>
     <string name="item_selection_charge_button_default">Charge</string>
     <string name="pos_error_no_mints_configured">Add at least one mint in Settings → Mints before charging customers.</string>
+    <string name="pos_error_no_network_pending_payment">Network connection is required to open pending payments.</string>
+    <string name="pos_error_no_network_charge">Network connection is required to create a charge.</string>
 
     <string name="item_selection_save_button">Save</string>
     <string name="item_selection_saved_baskets_button">Saved</string>
@@ -728,6 +730,14 @@
     
     <string name="settings_item_withdrawals_title">Withdrawals</string>
     <string name="settings_item_withdrawals_subtitle">Auto-withdraw settings and history</string>
+    <string name="settings_item_default_payment_method_title">Default Payment</string>
+    <string name="settings_item_default_payment_method_subtitle">Unified</string>
+    <string name="default_payment_method_explainer_title">Quick Settings</string>
+    <string name="default_payment_method_explainer_body">You can quickly change the default payment method directly from the payment screen by long-pressing on any of the Unified, Cashu, or Lightning tabs.</string>
+    <string name="default_payment_method_section_options">DEFAULT QR CODE</string>
+    <string name="default_payment_method_option_unified">Unified (Cashu + Lightning)</string>
+    <string name="default_payment_method_option_cashu">Cashu</string>
+    <string name="default_payment_method_option_lightning">Lightning</string>
 
     
     <string name="manual_withdraw_section_title">Manual Withdraw</string>
@@ -894,6 +904,7 @@
     <string name="pin_reset_paste_clipboard">Paste from Clipboard</string>
     <string name="pin_reset_button">Reset PIN</string>
     <string name="payment_request_tab_unified">Unified</string>
+    <string name="payment_request_default_method_set">%1$s set as default payment method</string>
     <string name="payment_request_default_description">Payment of %1$d sats</string>
     <string name="payment_request_lightning_description">Numo POS payment of %1$d sats</string>
 </resources>
