@@ -171,8 +171,9 @@ class AmountDisplayManager(
                 val fiatAmount = fiatCents / 100.0  // Convert to dollars for calculation
                 satsValue = fiatToSatoshis(fiatAmount)
                 
-                // Format display as fiat (with 2 decimals)
-                amountDisplayText = "$${String.format("%.2f", fiatAmount)}"
+                // Format display using Amount class for correct currency symbol
+                val displayCurrency = Amount.Currency.fromCode(activeMintUnit.uppercase())
+                amountDisplayText = Amount(fiatCents, displayCurrency).toString()
             }
             
             // Secondary display always shows sats equivalent
@@ -284,14 +285,14 @@ class AmountDisplayManager(
         
         // For stablesat (active mint unit is USD/EUR):
         if (isStablesatUnit()) {
-            // Try to get USD price first
-            var usdPrice = bitcoinPriceWorker?.getBtcUsdPrice() ?: 0.0
-            Log.d("AmountDisplayManager", "getBtcUsdPrice: $usdPrice")
+            // Use current price which respects the active currency
+            var price = bitcoinPriceWorker?.getCurrentPrice() ?: 0.0
+            Log.d("AmountDisplayManager", "getCurrentPrice: $price")
             
-            // If no USD price, try current price (might be EUR, GBP, etc)
-            if (usdPrice <= 0) {
-                usdPrice = bitcoinPriceWorker?.getCurrentPrice() ?: 0.0
-                Log.d("AmountDisplayManager", "getCurrentPrice: $usdPrice")
+            // Fallback to USD price if no current price available
+            if (price <= 0) {
+                price = bitcoinPriceWorker?.getBtcUsdPrice() ?: 0.0
+                Log.d("AmountDisplayManager", "getBtcUsdPrice fallback: $price")
             }
             
             // Log the currency being used
@@ -301,12 +302,12 @@ class AmountDisplayManager(
             } catch (e: Exception) { "unknown" }
             Log.d("AmountDisplayManager", "Current currency from CurrencyManager: $currency")
             
-            if (usdPrice > 0) {
-                Log.d("AmountDisplayManager", "Converting: $fiatAmount / $usdPrice * 100000000")
-                val btcAmount = fiatAmount / usdPrice
+            if (price > 0) {
+                Log.d("AmountDisplayManager", "Converting: $fiatAmount / $price * 100000000")
+                val btcAmount = fiatAmount / price
                 return (btcAmount * 100_000_000).toLong()
             } else {
-                Log.d("AmountDisplayManager", "No price - returning 0 (payment uses USD)")
+                Log.d("AmountDisplayManager", "No price - returning 0")
                 return 0L
             }
         }
