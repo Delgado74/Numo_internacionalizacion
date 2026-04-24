@@ -199,5 +199,5 @@ class PaymentTabManager(
         listener?.onTabSelected(tab)
     }
 
-    fun getCurrentTab(): PaymentTab = currentTab ?: PaymentTab.UNIFIED
+    fun getCurrentTab(): PaymentTab = currentTab ?: DefaultPaymentMethodManager.getInstance(unifiedTab.context).getDefaultPaymentMethod()
 }

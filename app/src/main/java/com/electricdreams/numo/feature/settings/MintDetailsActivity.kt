@@ -515,10 +515,7 @@ class MintDetailsActivity : AppCompatActivity() {
                     hideError()
                     loadMintIcon()
                     
-                    // Try to detect supported units from refreshed mint info
-                    detectAndStoreSupportedUnits()
-                    
-                    // Reload unit selector with new units
+                    // Reload unit selector after units are stored
                     loadUnitSelector()
                 } else {
                     showError()
@@ -529,26 +526,7 @@ class MintDetailsActivity : AppCompatActivity() {
             }
         }
     }
-
-    private fun detectAndStoreSupportedUnits() {
-        lifecycleScope.launch {
-            try {
-                val mintInfo = withContext(Dispatchers.IO) {
-                    CashuWalletManager.fetchMintInfo(mintUrl)
-                }
-                
-                if (mintInfo != null) {
-                    val units = CashuWalletManager.getSupportedUnits(mintInfo)
-                    mintManager.setSupportedUnits(mintUrl, units)
-                    Log.d(TAG, "Detected supported units for $mintUrl: $units")
-                }
-            } catch (e: Exception) {
-                Log.w(TAG, "Failed to detect supported units: ${e.message}")
-            }
-        }
-    }
-
-
+    
     private fun showError() {
         hasFetchError = true
         errorBanner.visibility = View.VISIBLE

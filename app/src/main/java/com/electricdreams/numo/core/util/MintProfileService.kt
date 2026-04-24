@@ -245,35 +245,17 @@ class MintProfileService private constructor(context: Context) {
         return try {
             val units = mutableSetOf<String>()
             
-            // Look for nuts.nut-04 (key is "4", not "04")
+            // Look for nuts.nut-04 (key is "4")
             if (json.has("nuts")) {
                 val nuts = json.getJSONObject("nuts")
                 
-                // Try both "4" and "04" for compatibility
+                // Use canonical NUT-04 key "4" (with "04" fallback for compatibility)
                 val nut04Key = if (nuts.has("4")) "4" else if (nuts.has("04")) "04" else null
                 
                 if (nut04Key != null) {
                     val nut04 = nuts.getJSONObject(nut04Key)
                     
-                    // Check for mint_method object with unit
-                    if (nut04.has("mint_method")) {
-                        val method = nut04.getJSONObject("mint_method")
-                        if (method.has("unit")) {
-                            units.add(method.getString("unit"))
-                        }
-                        // Also check methods array
-                        if (method.has("methods")) {
-                            val methods = method.getJSONArray("methods")
-                            for (i in 0 until methods.length()) {
-                                val m = methods.getJSONObject(i)
-                                if (m.has("unit")) {
-                                    units.add(m.getString("unit"))
-                                }
-                            }
-                        }
-                    }
-                    
-                    // Also check methods array at nut04 level
+                    // Parse units from the standard NUT-04 methods array
                     if (nut04.has("methods")) {
                         val methods = nut04.getJSONArray("methods")
                         for (i in 0 until methods.length()) {
