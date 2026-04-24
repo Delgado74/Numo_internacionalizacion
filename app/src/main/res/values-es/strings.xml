@@ -709,4 +709,5 @@ Estos términos pueden actualizarse. El uso continuado implica la aceptación.
     <string name="pin_reset_recovery_phrase">Frase de recuperación</string>
     <string name="pin_reset_paste_clipboard">Pegar del portapapeles</string>
     <string name="pin_reset_button">Restablecer PIN</string>
+    <string name="mint_active_unit_toast">Unidad activa: %1$s</string>
 </resources>

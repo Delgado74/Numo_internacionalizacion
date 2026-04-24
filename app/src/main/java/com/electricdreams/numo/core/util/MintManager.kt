@@ -5,7 +5,9 @@ import android.content.SharedPreferences
 import android.util.Log
 import com.electricdreams.numo.core.cashu.CashuWalletManager
 import com.electricdreams.numo.nostr.NostrMintBackup
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.net.URI
@@ -202,10 +204,30 @@ class MintManager private constructor(context: Context) {
      * Trigger async mint profile sync to detect supported units.
      */
     private fun triggerMintProfileSync(mintUrl: String) {
-        // This will be called from the MintProfileService which handles the actual sync
-        // The MintProfileService.fetchAndStoreMintProfile() already extracts and stores units
-        // So we just need to trigger it - the listener will handle this
         Log.d(TAG, "Triggering mint profile sync for unit detection: $mintUrl")
+        
+        // Use a simple coroutine scope for async profile fetch
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val normalized = normalizeMintUrl(mintUrl)
+                Log.d(TAG, "Starting async profile sync for: $normalized")
+                
+                val profileService = MintProfileService.getInstance(context)
+                val result = profileService.fetchAndStoreMintProfile(
+                    normalized,
+                    validateEndpoint = false,
+                    storeInCache = true
+                )
+                
+                if (result.success) {
+                    Log.d(TAG, "Mint profile sync completed successfully for: $normalized")
+                } else {
+                    Log.w(TAG, "Mint profile sync failed for: $normalized, error: ${result.errorType}")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error during mint profile sync: ${e.message}", e)
+            }
+        }
     }
 
     /**

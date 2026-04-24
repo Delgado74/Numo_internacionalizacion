@@ -925,6 +925,7 @@ Last updated: November 2024</string>
     <string name="onboarding_mints_popular_header">POPULAR MINTS</string>
     <string name="onboarding_mints_tap_hint">Tap to change default mint</string>
     <string name="onboarding_mints_set_default_toast">%1$s set as default</string>
+    <string name="mint_active_unit_toast">Active unit: %1$s</string>
 
     <!-- Payment Request -->
     <string name="payment_request_default_method_set">%1$s set as default payment method</string>

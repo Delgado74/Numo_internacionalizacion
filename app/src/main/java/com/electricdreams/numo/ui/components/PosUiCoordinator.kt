@@ -368,7 +368,7 @@ class PosUiCoordinator(
             unitSelectorContainer.visibility = View.VISIBLE
             
             // Show current unit in button text
-            val displayText = if (activeUnit == "sat") "SAT" else "USD"
+            val displayText = activeUnit.uppercase()
             unitToggleButton.text = displayText
             
             // Button style based on unit (filled or outlined)

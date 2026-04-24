@@ -296,7 +296,7 @@ class MintDetailsActivity : AppCompatActivity() {
         val supportedUnits = mintManager.getSupportedUnits(mintUrl) ?: listOf("sat")
         updateUnitButtons(unit, supportedUnits)
         
-        Toast.makeText(this, "Active unit: $unit", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, getString(R.string.mint_active_unit_toast, unit.uppercase()), Toast.LENGTH_SHORT).show()
         
         // Broadcast balance refresh to update POS display
         BalanceRefreshBroadcast.send(this)
