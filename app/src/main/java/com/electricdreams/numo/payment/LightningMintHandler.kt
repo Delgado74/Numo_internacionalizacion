@@ -230,14 +230,24 @@ class LightningMintHandler(
      * @param mintUrlStr The mint URL as a string
      * @param invoice The BOLT11 invoice string
      * @param callback Callback for Lightning mint events
+     * @param activeUnit The currency unit for this payment (sat, usd, eur)
      */
-    fun resume(quoteId: String, mintUrlStr: String, invoice: String, callback: Callback) {
+    fun resume(quoteId: String, mintUrlStr: String, invoice: String, callback: Callback, activeUnit: String = "sat") {
         val wallet = CashuWalletManager.getWallet()
         if (wallet == null) {
             Log.w(TAG, "MultiMintWallet not ready, cannot resume Lightning quote")
             callback.onError("Wallet not ready")
             return
         }
+        
+        // Set the currency unit for this payment
+        currentCurrencyUnit = when (activeUnit.lowercase()) {
+            "usd" -> CurrencyUnit.Usd
+            "eur" -> CurrencyUnit.Eur
+            "msat" -> CurrencyUnit.Msat
+            else -> CurrencyUnit.Sat
+        }
+        Log.d(TAG, "Resuming Lightning quote with unit: $activeUnit -> $currentCurrencyUnit")
 
         val mintUrl = try {
             MintUrl(mintUrlStr)

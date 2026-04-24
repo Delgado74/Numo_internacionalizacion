@@ -33,6 +33,8 @@ object PaymentIntentFactory {
             entry.lightningInvoice?.let {
                 putExtra(PaymentRequestActivity.EXTRA_LIGHTNING_INVOICE, it)
             }
+            // Pass the active unit for Lightning resume
+            putExtra(PaymentRequestActivity.EXTRA_ACTIVE_UNIT, entry.getUnit())
             entry.nostrSecretHex?.let {
                 putExtra(PaymentRequestActivity.EXTRA_NOSTR_SECRET_HEX, it)
             }

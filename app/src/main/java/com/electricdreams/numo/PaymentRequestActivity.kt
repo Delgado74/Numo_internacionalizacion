@@ -801,7 +801,8 @@ class PaymentRequestActivity : AppCompatActivity() {
                 quoteId = resumeLightningQuoteId!!,
                 mintUrlStr = resumeLightningMintUrl!!,
                 invoice = resumeLightningInvoice!!,
-                callback = createLightningCallback()
+                callback = createLightningCallback(),
+                activeUnit = activeUnit
             )
         } else {
             // Start fresh Lightning flow

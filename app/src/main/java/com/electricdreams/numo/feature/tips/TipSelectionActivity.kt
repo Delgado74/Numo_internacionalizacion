@@ -54,6 +54,7 @@ class TipSelectionActivity : AppCompatActivity() {
     private var entryCurrency: Currency = Currency.USD
     private var enteredAmountFiat: Long = 0
     private var checkoutBasketJson: String? = null
+    private var activeUnit: String = "sat"
 
     // State
     private var selectedTipSats: Long = 0
@@ -136,6 +137,7 @@ class TipSelectionActivity : AppCompatActivity() {
         paymentAmountSats = intent.getLongExtra(EXTRA_PAYMENT_AMOUNT, 0)
         formattedAmount = intent.getStringExtra(EXTRA_FORMATTED_AMOUNT) ?: ""
         checkoutBasketJson = intent.getStringExtra(EXTRA_CHECKOUT_BASKET_JSON)
+        activeUnit = intent.getStringExtra(PaymentRequestActivity.EXTRA_ACTIVE_UNIT) ?: "sat"
 
         // Parse entry currency
         val parsedAmount = Amount.parse(formattedAmount)
@@ -943,9 +945,7 @@ class TipSelectionActivity : AppCompatActivity() {
             putExtra(EXTRA_BASE_AMOUNT_SATS, paymentAmountSats)
             putExtra(EXTRA_BASE_FORMATTED_AMOUNT, formattedAmount)
             // Pass through the active unit (for stablesat support)
-            intent.getStringExtra(PaymentRequestActivity.EXTRA_ACTIVE_UNIT)?.let {
-                putExtra(PaymentRequestActivity.EXTRA_ACTIVE_UNIT, it)
-            }
+            putExtra(PaymentRequestActivity.EXTRA_ACTIVE_UNIT, activeUnit)
             checkoutBasketJson?.let {
                 putExtra(PaymentRequestActivity.EXTRA_CHECKOUT_BASKET_JSON, it)
             }
