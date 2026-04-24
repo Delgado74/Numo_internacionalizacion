@@ -108,7 +108,7 @@
     
     <string name="onboarding_welcome_tagline">Accept Bitcoin payments instantly with zero fees.</string>
     <string name="onboarding_welcome_message">Accept Bitcoin payments instantly with zero fees using Cashu ecash technology.</string>
-    <string name="onboarding_terms_text">By continuing, you agree to our Terms of Service and Privacy Policy</string>
+    <string name="onboarding_terms_text">By continuing, you agree to our <annotation id="terms">Terms of Service</annotation> and <annotation id="privacy">Privacy Policy</annotation></string>
     <string name="onboarding_get_started">Get Started</string>
 
     
@@ -581,6 +581,8 @@
     <string name="item_selection_charge_button">Charge</string>
     <string name="item_selection_charge_button_default">Charge</string>
     <string name="pos_error_no_mints_configured">Add at least one mint in Settings → Mints before charging customers.</string>
+    <string name="pos_error_no_network_pending_payment">Network connection is required to open pending payments.</string>
+    <string name="pos_error_no_network_charge">Network connection is required to create a charge.</string>
 
     <string name="item_selection_save_button">Save</string>
     <string name="item_selection_saved_baskets_button">Saved</string>
