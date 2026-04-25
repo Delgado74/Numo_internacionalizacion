@@ -28,6 +28,7 @@ import com.electricdreams.numo.core.util.BalanceRefreshBroadcast
 import com.electricdreams.numo.core.util.MintIconCache
 import com.electricdreams.numo.core.util.MintManager
 import com.electricdreams.numo.core.util.MintProfileService
+import com.electricdreams.numo.core.worker.BitcoinPriceWorker
 import com.electricdreams.numo.ui.util.DialogHelper
 import com.electricdreams.numo.feature.enableEdgeToEdgeWithPill
 import kotlinx.coroutines.Dispatchers
@@ -391,18 +392,36 @@ class MintDetailsActivity : AppCompatActivity() {
             val usdBalance = mintBalances?.get("usd") ?: 0L
             val eurBalance = mintBalances?.get("eur") ?: 0L
             
+            // Mostrar balance en SAT (siempre en sats)
             balanceText.text = Amount(satBalance, Amount.Currency.BTC).toString()
             
-            if (usdBalance > 0) {
+            // Los balances USD/EUR vienen del SDK en sats, convertir a fiat para display
+            val displayUsd = if (usdBalance > 0) {
+                val btcPrice = BitcoinPriceWorker.getInstance(applicationContext)?.getBtcUsdPrice() ?: 0.0
+                if (btcPrice > 0) {
+                    val btc = usdBalance / 100_000_000.0
+                    btc * btcPrice
+                } else 0.0
+            } else 0.0
+            
+            val displayEur = if (eurBalance > 0) {
+                val btcPrice = BitcoinPriceWorker.getInstance(applicationContext)?.getBtcEurPrice() ?: 0.0
+                if (btcPrice > 0) {
+                    val btc = eurBalance / 100_000_000.0
+                    btc * btcPrice
+                } else 0.0
+            } else 0.0
+            
+            if (displayUsd > 0) {
                 balanceUsdText.visibility = View.VISIBLE
-                balanceUsdText.text = "$${usdBalance / 100.0}"
+                balanceUsdText.text = "$${String.format("%.2f", displayUsd)}"
             } else {
                 balanceUsdText.visibility = View.GONE
             }
 
-            if (eurBalance > 0) {
+            if (displayEur > 0) {
                 balanceEurText.visibility = View.VISIBLE
-                balanceEurText.text = "€${eurBalance / 100.0}"
+                balanceEurText.text = "€${String.format("%.2f", displayEur)}"
             } else {
                 balanceEurText.visibility = View.GONE
             }
