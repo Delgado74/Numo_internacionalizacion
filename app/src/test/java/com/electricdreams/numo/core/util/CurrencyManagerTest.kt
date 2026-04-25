@@ -108,10 +108,10 @@ class CurrencyManagerTest {
     @Test
     fun `getPriceApiUrl returns correct URL`() {
         currencyManager.setPreferredCurrency("EUR")
-        assertEquals("https://api.coinbase.com/v2/prices/BTC-EUR/spot", currencyManager.getPriceApiUrl())
+        assertEquals("https://api.yadio.io/rate/EUR/BTC", currencyManager.getPriceApiUrl())
 
         currencyManager.setPreferredCurrency("USD")
-        assertEquals("https://api.coinbase.com/v2/prices/BTC-USD/spot", currencyManager.getPriceApiUrl())
+        assertEquals("https://api.yadio.io/rate/USD/BTC", currencyManager.getPriceApiUrl())
 
         currencyManager.setPreferredCurrency("JPY")
         assertEquals("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=jpy", currencyManager.getPriceApiUrl())
@@ -170,10 +170,10 @@ class CurrencyManagerTest {
     }
 
     @Test
-    fun `parsePriceResponse parses Coinbase response for USD`() {
+    fun `parsePriceResponse parses Yadio response for USD`() {
         currencyManager.setPreferredCurrency("USD")
-        val coinbaseResponse = """{"data":{"amount":97500.50}}"""
-        assertEquals(97500.50, currencyManager.parsePriceResponse(coinbaseResponse), 0.01)
+        val yadioResponse = """{"rate": "97500.50"}"""
+        assertEquals(97500.50, currencyManager.parsePriceResponse(yadioResponse), 0.01)
     }
 
     @Test
