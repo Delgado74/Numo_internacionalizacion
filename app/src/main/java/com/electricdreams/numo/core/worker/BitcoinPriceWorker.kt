@@ -105,6 +105,11 @@ class BitcoinPriceWorker private constructor(context: Context) {
         if (currentCurrency != CurrencyManager.CURRENCY_USD) {
             loadCachedPrice(CurrencyManager.CURRENCY_USD)
         }
+        
+        // Always load EUR as fallback for stablesat
+        if (currentCurrency != CurrencyManager.CURRENCY_EUR) {
+            loadCachedPrice(CurrencyManager.CURRENCY_EUR)
+        }
     }
     
     private fun loadCachedPrice(currency: String) {
@@ -197,58 +202,66 @@ class BitcoinPriceWorker private constructor(context: Context) {
     /** Fetch the current Bitcoin price from Coinbase API for the current currency. */
     private fun fetchPrice() {
         Thread {
-            var connection: HttpURLConnection? = null
-            var reader: BufferedReader? = null
-
             try {
-                val currency = currencyManager.getCurrentCurrency()
-                val apiUrl = currencyManager.getPriceApiUrl()
-                Log.d(TAG, "Fetching Bitcoin price in $currency from: $apiUrl")
-
-                val uri = URI(apiUrl)
-                val url: URL = uri.toURL()
-
-                connection = (url.openConnection() as HttpURLConnection).apply {
-                    requestMethod = "GET"
-                    connectTimeout = 5000
-                    readTimeout = 5000
+                // Always fetch USD and EUR prices for stablesat support
+                fetchPriceForCurrency(CurrencyManager.CURRENCY_USD)
+                fetchPriceForCurrency(CurrencyManager.CURRENCY_EUR)
+                
+                // Also fetch current app currency if not USD/EUR
+                val currentCurrency = currencyManager.getCurrentCurrency()
+                if (currentCurrency != CurrencyManager.CURRENCY_USD && currentCurrency != CurrencyManager.CURRENCY_EUR) {
+                    fetchPriceForCurrency(currentCurrency)
                 }
-
-                val responseCode = connection.responseCode
-                if (responseCode == HttpURLConnection.HTTP_OK) {
-                    reader = BufferedReader(InputStreamReader(connection.inputStream))
-                    val response = buildString {
-                        var line: String?
-                        while (reader!!.readLine().also { line = it } != null) {
-                            append(line)
-                        }
-                    }
-
-                    val price = currencyManager.parsePriceResponse(response)
-
-                    priceByCurrency[currency] = price
-                    cachePrice(currency, price)
-
-                    Log.d(TAG, "Bitcoin price updated: $price $currency")
-                    notifyListener()
-                } else {
-                    Log.e(TAG, "Failed to fetch Bitcoin price, response code: $responseCode")
-                }
-            } catch (e: IOException) {
-                Log.e(TAG, "Error fetching Bitcoin price: ${e.message}", e)
-            } catch (e: JSONException) {
-                Log.e(TAG, "Error parsing Bitcoin price JSON: ${e.message}", e)
-            } catch (e: URISyntaxException) {
-                Log.e(TAG, "Invalid Bitcoin price URI: ${e.message}", e)
-            } finally {
-                try {
-                    reader?.close()
-                } catch (e: IOException) {
-                    Log.e(TAG, "Error closing reader: ${e.message}", e)
-                }
-                connection?.disconnect()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error fetching Bitcoin prices: ${e.message}", e)
             }
         }.start()
+    }
+    
+    private fun fetchPriceForCurrency(currency: String) {
+        var connection: HttpURLConnection? = null
+        var reader: BufferedReader? = null
+
+        try {
+            val apiUrl = currencyManager.getPriceApiUrlForCurrency(currency)
+            Log.d(TAG, "Fetching Bitcoin price in $currency from: $apiUrl")
+
+            val uri = URI(apiUrl)
+            val url: URL = uri.toURL()
+
+            connection = (url.openConnection() as HttpURLConnection).apply {
+                requestMethod = "GET"
+                connectTimeout = 5000
+                readTimeout = 5000
+            }
+
+            val responseCode = connection.responseCode
+            if (responseCode == HttpURLConnection.HTTP_OK) {
+                reader = BufferedReader(InputStreamReader(connection.inputStream))
+                val response = buildString {
+                    var line: String?
+                    while (reader!!.readLine().also { line = it } != null) {
+                        append(line)
+                    }
+                }
+
+                val price = currencyManager.parsePriceResponseForCurrency(currency, response)
+
+                priceByCurrency[currency] = price
+                cachePrice(currency, price)
+
+                Log.d(TAG, "Bitcoin price updated for $currency: $price")
+            } else {
+                Log.e(TAG, "Failed to fetch Bitcoin price for $currency, response code: $responseCode")
+            }
+        } catch (e: IOException) {
+            Log.e(TAG, "Error fetching Bitcoin price for $currency: ${e.message}", e)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error fetching Bitcoin price for $currency: ${e.message}", e)
+        } finally {
+            try { reader?.close() } catch (e: Exception) {}
+            connection?.disconnect()
+        }
     }
 
     /** Cache the Bitcoin price for a specific currency in SharedPreferences. */

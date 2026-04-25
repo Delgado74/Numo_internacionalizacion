@@ -147,13 +147,23 @@ class CurrencyManager private constructor(context: Context) {
 
     /** Get the API URL for the current currency. Falls back to Coinbase. */
     fun getPriceApiUrl(): String {
-        return CUSTOM_APIS[currentCurrency]?.url
-            ?: "${COINBASE_BASE_URL}$currentCurrency/spot"
+        return getPriceApiUrlForCurrency(currentCurrency)
+    }
+
+    /** Get the API URL for a specific currency. */
+    fun getPriceApiUrlForCurrency(currency: String): String {
+        return CUSTOM_APIS[currency]?.url
+            ?: "${COINBASE_BASE_URL}$currency/spot"
     }
 
     /** Parse a price API response for the current currency. */
     fun parsePriceResponse(response: String): Double {
-        val parser = CUSTOM_APIS[currentCurrency]?.parsePrice ?: COINBASE_PARSER
+        return parsePriceResponseForCurrency(currentCurrency, response)
+    }
+
+    /** Parse a price API response for a specific currency. */
+    fun parsePriceResponseForCurrency(currency: String, response: String): Double {
+        val parser = CUSTOM_APIS[currency]?.parsePrice ?: COINBASE_PARSER
         return parser(response)
     }
 
