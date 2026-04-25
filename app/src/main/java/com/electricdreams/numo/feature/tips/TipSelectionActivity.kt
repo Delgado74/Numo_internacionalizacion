@@ -134,9 +134,9 @@ class TipSelectionActivity : AppCompatActivity() {
     }
 
     private fun initializeFromIntent() {
-        val rawAmount = intent.getLongExtra(EXTRA_PAYMENT_AMOUNT, 0)
-        formattedAmount = intent.getStringExtra(EXTRA_FORMATTED_AMOUNT) ?: ""
-        checkoutBasketJson = intent.getStringExtra(EXTRA_CHECKOUT_BASKET_JSON)
+        val rawAmount = intent.getLongExtra(PaymentRequestActivity.EXTRA_PAYMENT_AMOUNT, 0)
+        formattedAmount = intent.getStringExtra(PaymentRequestActivity.EXTRA_FORMATTED_AMOUNT) ?: ""
+        checkoutBasketJson = intent.getStringExtra(PaymentRequestActivity.EXTRA_CHECKOUT_BASKET_JSON)
         activeUnit = intent.getStringExtra(PaymentRequestActivity.EXTRA_ACTIVE_UNIT) ?: "sat"
 
         // Convert amount based on active unit
@@ -145,16 +145,25 @@ class TipSelectionActivity : AppCompatActivity() {
         bitcoinPriceWorker = BitcoinPriceWorker.getInstance(applicationContext)
         bitcoinPrice = bitcoinPriceWorker?.getCurrentPrice() ?: 0.0
 
+        // Convert amount based on active unit
+        // For USD/EUR: rawAmount is in cents, convert to sats
+        // For SAT: rawAmount is already in sats
+        Log.d(TAG, "INIT: rawAmount=$rawAmount, activeUnit=$activeUnit, bitcoinPrice=$bitcoinPrice")
+        
         paymentAmountSats = if (activeUnit == "usd" || activeUnit == "eur") {
             if (bitcoinPrice > 0 && rawAmount > 0) {
                 val fiatAmount = rawAmount / 100.0 // cents to dollars/euros
-                (fiatAmount / bitcoinPrice * 100_000_000).toLong()
+                val converted = (fiatAmount / bitcoinPrice * 100_000_000).toLong()
+                Log.d(TAG, "CONVERT: cents=$rawAmount, fiat=$$fiatAmount, price=$$bitcoinPrice -> sats=$converted")
+                converted
             } else {
                 rawAmount
             }
         } else {
             rawAmount // already in sats
         }
+        
+        Log.d(TAG, "RESULT: paymentAmountSats=$paymentAmountSats")
 
         // Parse entry currency
         val parsedAmount = Amount.parse(formattedAmount)
@@ -953,10 +962,10 @@ class TipSelectionActivity : AppCompatActivity() {
         val intent = Intent(this, PaymentRequestActivity::class.java).apply {
             putExtra(PaymentRequestActivity.EXTRA_PAYMENT_AMOUNT, totalAmountSats)
             putExtra(PaymentRequestActivity.EXTRA_FORMATTED_AMOUNT, newFormattedAmount)
-            putExtra(EXTRA_TIP_AMOUNT_SATS, selectedTipSats)
-            putExtra(EXTRA_TIP_PERCENTAGE, selectedTipPercentage)
-            putExtra(EXTRA_BASE_AMOUNT_SATS, paymentAmountSats)
-            putExtra(EXTRA_BASE_FORMATTED_AMOUNT, formattedAmount)
+            putExtra("tip_amount_sats", selectedTipSats)
+            putExtra("tip_percentage", selectedTipPercentage)
+            putExtra("base_amount_sats", paymentAmountSats)
+            putExtra("base_formatted_amount", formattedAmount)
             // Pass through the active unit (for stablesat support)
             putExtra(PaymentRequestActivity.EXTRA_ACTIVE_UNIT, activeUnit)
             // Flag: amount is already in sats, not cents

@@ -404,10 +404,10 @@ class PaymentRequestActivity : AppCompatActivity() {
      * Called BEFORE createPendingPayment() so tip data is available.
      */
     private fun readTipInfoFromIntent() {
-        tipAmountSats = intent.getLongExtra(TipSelectionActivity.EXTRA_TIP_AMOUNT_SATS, 0)
-        tipPercentage = intent.getIntExtra(TipSelectionActivity.EXTRA_TIP_PERCENTAGE, 0)
-        baseAmountSats = intent.getLongExtra(TipSelectionActivity.EXTRA_BASE_AMOUNT_SATS, 0)
-        baseFormattedAmount = intent.getStringExtra(TipSelectionActivity.EXTRA_BASE_FORMATTED_AMOUNT) ?: ""
+        tipAmountSats = intent.getLongExtra("tip_amount_sats", 0)
+        tipPercentage = intent.getIntExtra("tip_percentage", 0)
+        baseAmountSats = intent.getLongExtra("base_amount_sats", 0)
+        baseFormattedAmount = intent.getStringExtra("base_formatted_amount") ?: ""
         
         if (tipAmountSats > 0) {
             Log.d(TAG, "Read tip info from intent: tipAmount=$tipAmountSats, tipPercent=$tipPercentage%, baseAmount=$baseAmountSats")

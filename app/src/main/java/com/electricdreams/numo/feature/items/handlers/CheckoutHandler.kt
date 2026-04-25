@@ -90,9 +90,9 @@ class CheckoutHandler(
         if (tipsManager.tipsEnabled) {
             // Route through beautiful tip selection screen first
             val intent = Intent(activity, TipSelectionActivity::class.java).apply {
-                putExtra(TipSelectionActivity.EXTRA_PAYMENT_AMOUNT, paymentAmount)
-                putExtra(TipSelectionActivity.EXTRA_FORMATTED_AMOUNT, formattedAmount)
-                putExtra(TipSelectionActivity.EXTRA_CHECKOUT_BASKET_JSON, checkoutBasketJson)
+                putExtra("payment_amount", paymentAmount)
+                putExtra("formatted_amount", formattedAmount)
+                putExtra("checkout_basket_json", checkoutBasketJson)
                 putExtra(PaymentRequestActivity.EXTRA_ACTIVE_UNIT, activeUnit)
                 // Amount is in cents for USD/EUR, will be converted by TipSelectionActivity
                 putExtra("amount_in_sats", false)
@@ -103,9 +103,9 @@ class CheckoutHandler(
         } else {
             // Go directly to payment request without tips
             val intent = Intent(activity, PaymentRequestActivity::class.java).apply {
-                putExtra(PaymentRequestActivity.EXTRA_PAYMENT_AMOUNT, paymentAmount)
-                putExtra(PaymentRequestActivity.EXTRA_FORMATTED_AMOUNT, formattedAmount)
-                putExtra(PaymentRequestActivity.EXTRA_CHECKOUT_BASKET_JSON, checkoutBasketJson)
+                putExtra("payment_amount", paymentAmount)
+                putExtra("formatted_amount", formattedAmount)
+                putExtra("checkout_basket_json", checkoutBasketJson)
                 putExtra(PaymentRequestActivity.EXTRA_ACTIVE_UNIT, activeUnit)
                 // Flag: amount is already in correct units (cents for USD/EUR, sats for sat)
                 putExtra("amount_in_sats", activeUnit == "sat")
