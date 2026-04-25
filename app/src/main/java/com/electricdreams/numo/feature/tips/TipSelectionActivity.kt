@@ -145,16 +145,22 @@ class TipSelectionActivity : AppCompatActivity() {
         bitcoinPriceWorker = BitcoinPriceWorker.getInstance(applicationContext)
         bitcoinPrice = bitcoinPriceWorker?.getCurrentPrice() ?: 0.0
 
-        // Convert amount based on active unit
-        // For USD/EUR: rawAmount is in cents, convert to sats
-        // For SAT: rawAmount is already in sats
-        Log.d(TAG, "INIT: rawAmount=$rawAmount, activeUnit=$activeUnit, bitcoinPrice=$bitcoinPrice")
+        // Get price for the active unit (not the app's display currency)
+        // If activeUnit is USD, use USD price; if EUR, use EUR price
+        val priceForActiveUnit = when (activeUnit) {
+            "usd" -> bitcoinPriceWorker?.getBtcUsdPrice() ?: bitcoinPrice
+            "eur" -> bitcoinPriceWorker?.getBtcEurPrice() ?: bitcoinPrice
+            else -> bitcoinPrice
+        }
+
+        Log.d(TAG, "INIT: rawAmount=$rawAmount, activeUnit=$activeUnit, appPrice=$bitcoinPrice, unitPrice=$priceForActiveUnit")
         
+        // Convert amount based on active unit
         paymentAmountSats = if (activeUnit == "usd" || activeUnit == "eur") {
-            if (bitcoinPrice > 0 && rawAmount > 0) {
+            if (priceForActiveUnit > 0 && rawAmount > 0) {
                 val fiatAmount = rawAmount / 100.0 // cents to dollars/euros
-                val converted = (fiatAmount / bitcoinPrice * 100_000_000).toLong()
-                Log.d(TAG, "CONVERT: cents=$rawAmount, fiat=$$fiatAmount, price=$$bitcoinPrice -> sats=$converted")
+                val converted = (fiatAmount / priceForActiveUnit * 100_000_000).toLong()
+                Log.d(TAG, "CONVERT: cents=$rawAmount, fiat=$$fiatAmount, price=$$priceForActiveUnit -> sats=$converted")
                 converted
             } else {
                 rawAmount

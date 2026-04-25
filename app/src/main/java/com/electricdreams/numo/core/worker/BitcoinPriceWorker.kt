@@ -160,6 +160,11 @@ class BitcoinPriceWorker private constructor(context: Context) {
         return priceByCurrency[CurrencyManager.CURRENCY_USD] ?: 0.0
     }
 
+    /** Get the current BTC price in EUR. */
+    fun getBtcEurPrice(): Double {
+        return priceByCurrency[CurrencyManager.CURRENCY_EUR] ?: 0.0
+    }
+
     /** Convert satoshis to the current currency based on current BTC price. */
     fun satoshisToFiat(satoshis: Long): Double {
         val currentPrice = getCurrentPrice()
