@@ -34,7 +34,7 @@ class PaymentRoutingCoreTest {
         val decision = PaymentRoutingCore.RoutingDecision(PaymentRoutingCore.TargetActivity.PAYMENT_REQUEST)
         val context: Context = ApplicationProvider.getApplicationContext()
 
-        val intent = decision.buildIntent(context, amount = 42L, formattedAmount = "42 sats", checkoutBasketJson = "{}")
+        val intent = decision.buildIntent(context, amount = 42L, formattedAmount = "42 sats", activeUnit = "sat", checkoutBasketJson = "{}")
 
         val component = intent.component
         assertNotNull(component)
