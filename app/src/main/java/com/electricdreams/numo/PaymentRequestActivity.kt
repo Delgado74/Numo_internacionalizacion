@@ -475,17 +475,20 @@ class PaymentRequestActivity : AppCompatActivity() {
     }
 
 private fun updateConvertedAmount(formattedAmountString: String) {
-        val isBtcAmount = formattedAmountString.startsWith("₿")
+        // If amount is already in sats (from tip selection), show fiat conversion
         val hasBitcoinPrice = (bitcoinPriceWorker?.getCurrentPrice() ?: 0.0) > 0
+
+        Log.d(TAG, "updateConvertedAmount: paymentAmount=$paymentAmount, formattedAmount=$formattedAmountString, btcPrice=$hasBitcoinPrice")
 
         if (!hasBitcoinPrice) {
             convertedAmountDisplay.visibility = View.GONE
             return
         }
 
-        // Payment is already in sats - show fiat conversion
+        // Amount is in sats - convert to fiat for display
         if (paymentAmount > 0) {
             val fiatValue = bitcoinPriceWorker?.satoshisToFiat(paymentAmount) ?: 0.0
+            Log.d(TAG, "updateConvertedAmount: sats=$paymentAmount -> fiat=$fiatValue")
             if (fiatValue > 0) {
                 val formattedFiat = bitcoinPriceWorker?.formatFiatAmount(fiatValue)
                     ?: CurrencyManager.getInstance(this).formatCurrencyAmount(fiatValue)
