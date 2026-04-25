@@ -306,18 +306,19 @@ class PaymentRequestActivity : AppCompatActivity() {
         val intentUnit = intent.getStringExtra(EXTRA_ACTIVE_UNIT)
         activeUnit = intentUnit ?: "sat"
         
-        // If amount came from TipSelectionActivity, it's already in sats - treat accordingly
-        // Otherwise (from POS), convert cents to sats for USD/EUR
-        if (!amountInSats && (activeUnit == "usd" || activeUnit == "eur")) {
+        // If amount came from POS (not from TipSelectionActivity) and is USD/EUR, convert cents to sats
+        // amountInSats = true means it's already in sats (from TipSelectionActivity)
+        if (!amountInSats && activeUnit != "sat") {
             val btcPrice = bitcoinPriceWorker?.getCurrentPrice() ?: 0.0
             if (btcPrice > 0) {
                 val fiatAmount = paymentAmount / 100.0
-                paymentAmount = (fiatAmount / btcPrice * 100_000_000).toLong()
-                Log.d(TAG, "Converted cents to sats: $paymentAmount")
+                val satsConverted = (fiatAmount / btcPrice * 100_000_000).toLong()
+                Log.d(TAG, "CONVERTING: cents=$paymentAmount, fiat=$$fiatAmount, btcPrice=$$btcPrice -> sats=$satsConverted")
+                paymentAmount = satsConverted
             }
         }
         
-        Log.d(TAG, "onCreate: EXTRA_ACTIVE_UNIT from intent='$intentUnit', activeUnit='$activeUnit', amountInSats=$amountInSats")
+        Log.d(TAG, "onCreate: intentUnit='$intentUnit', activeUnit='$activeUnit', amountInSats=$amountInSats, paymentAmount=$paymentAmount")
 
         if (paymentAmount <= 0) {
             Log.e(TAG, "Invalid payment amount: $paymentAmount")
