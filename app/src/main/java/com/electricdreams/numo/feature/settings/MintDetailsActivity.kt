@@ -66,6 +66,7 @@ class MintDetailsActivity : AppCompatActivity() {
     private lateinit var mintUrlText: TextView
     private lateinit var balanceText: TextView
     private lateinit var balanceUsdText: TextView
+    private lateinit var balanceEurText: TextView
     private lateinit var lightningBadge: LinearLayout
 
     // Content sections
@@ -170,6 +171,7 @@ class MintDetailsActivity : AppCompatActivity() {
         mintUrlText = findViewById(R.id.mint_url)
         balanceText = findViewById(R.id.balance_text)
         balanceUsdText = findViewById(R.id.balance_usd_text)
+        balanceEurText = findViewById(R.id.balance_eur_text)
         lightningBadge = findViewById(R.id.lightning_badge)
         
         descriptionSection = findViewById(R.id.description_section)
@@ -387,6 +389,7 @@ class MintDetailsActivity : AppCompatActivity() {
             val mintBalances = balancesByUnit[mintUrl]
             val satBalance = mintBalances?.get("sat") ?: 0L
             val usdBalance = mintBalances?.get("usd") ?: 0L
+            val eurBalance = mintBalances?.get("eur") ?: 0L
             
             balanceText.text = Amount(satBalance, Amount.Currency.BTC).toString()
             
@@ -395,6 +398,13 @@ class MintDetailsActivity : AppCompatActivity() {
                 balanceUsdText.text = "$${usdBalance / 100.0}"
             } else {
                 balanceUsdText.visibility = View.GONE
+            }
+
+            if (eurBalance > 0) {
+                balanceEurText.visibility = View.VISIBLE
+                balanceEurText.text = "€${eurBalance / 100.0}"
+            } else {
+                balanceEurText.visibility = View.GONE
             }
         }
     }
