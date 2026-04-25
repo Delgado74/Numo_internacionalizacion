@@ -75,7 +75,17 @@ class AmountDisplayManager(
     /** Set the active mint unit (sat, usd, eur) from mint selection */
     fun setActiveMintUnit(unit: String) {
         activeMintUnit = unit.lowercase()
-        Log.d("AmountDisplayManager", "Set active mint unit: $activeMintUnit")
+        
+        // Sync input mode based on active unit
+        // If USD or EUR, we should be in fiat input mode
+        // If SAT, we should be in sat input mode
+        if (isStablesatUnit() && !isUsdInputMode) {
+            isUsdInputMode = true
+        } else if (!isStablesatUnit() && isUsdInputMode) {
+            isUsdInputMode = false
+        }
+        
+        Log.d("AmountDisplayManager", "Set active mint unit: $activeMintUnit, isUsdInputMode: $isUsdInputMode")
     }
     
     /** Check if current active unit is a fiat unit (stablesat USD/EUR) */
