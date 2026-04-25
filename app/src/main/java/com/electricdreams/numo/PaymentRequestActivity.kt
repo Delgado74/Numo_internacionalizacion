@@ -459,10 +459,8 @@ class PaymentRequestActivity : AppCompatActivity() {
         Log.d(TAG, "   📱 Formatted: $formattedAmountString")
     }
 
-    private fun updateConvertedAmount(formattedAmountString: String) {
-        // Check if the formatted amount is BTC (satoshis) or fiat
+private fun updateConvertedAmount(formattedAmountString: String) {
         val isBtcAmount = formattedAmountString.startsWith("₿")
-
         val hasBitcoinPrice = (bitcoinPriceWorker?.getCurrentPrice() ?: 0.0) > 0
 
         if (!hasBitcoinPrice) {
@@ -470,8 +468,9 @@ class PaymentRequestActivity : AppCompatActivity() {
             return
         }
 
+        val isStablesatUnit = activeUnit == "usd" || activeUnit == "eur"
+
         if (isBtcAmount) {
-            // Main amount is BTC, show fiat conversion
             val fiatValue = bitcoinPriceWorker?.satoshisToFiat(paymentAmount) ?: 0.0
             if (fiatValue > 0) {
                 val formattedFiat = bitcoinPriceWorker?.formatFiatAmount(fiatValue)
@@ -482,10 +481,19 @@ class PaymentRequestActivity : AppCompatActivity() {
                 convertedAmountDisplay.visibility = View.GONE
             }
         } else {
-            // Main amount is fiat, show BTC conversion
-            // paymentAmount is always in satoshis, so we can use it directly
             if (paymentAmount > 0) {
-                val formattedBtc = Amount(paymentAmount, Currency.BTC).toString()
+                val satsValue = if (isStablesatUnit) {
+                    val fiatAmount = paymentAmount / 100.0
+                    val btcPrice = bitcoinPriceWorker?.getCurrentPrice() ?: 0.0
+                    if (btcPrice > 0) {
+                        (fiatAmount / btcPrice * 100_000_000).toLong()
+                    } else {
+                        paymentAmount
+                    }
+                } else {
+                    paymentAmount
+                }
+                val formattedBtc = Amount(satsValue, Currency.BTC).toString()
                 convertedAmountDisplay.text = formattedBtc
                 convertedAmountDisplay.visibility = View.VISIBLE
             } else {
