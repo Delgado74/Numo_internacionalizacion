@@ -134,10 +134,27 @@ class TipSelectionActivity : AppCompatActivity() {
     }
 
     private fun initializeFromIntent() {
-        paymentAmountSats = intent.getLongExtra(EXTRA_PAYMENT_AMOUNT, 0)
+        val rawAmount = intent.getLongExtra(EXTRA_PAYMENT_AMOUNT, 0)
         formattedAmount = intent.getStringExtra(EXTRA_FORMATTED_AMOUNT) ?: ""
         checkoutBasketJson = intent.getStringExtra(EXTRA_CHECKOUT_BASKET_JSON)
         activeUnit = intent.getStringExtra(PaymentRequestActivity.EXTRA_ACTIVE_UNIT) ?: "sat"
+
+        // Convert amount based on active unit
+        // For USD/EUR: rawAmount is in cents, convert to sats
+        // For SAT: rawAmount is already in sats
+        bitcoinPriceWorker = BitcoinPriceWorker.getInstance(applicationContext)
+        bitcoinPrice = bitcoinPriceWorker?.getCurrentPrice() ?: 0.0
+
+        paymentAmountSats = if (activeUnit == "usd" || activeUnit == "eur") {
+            if (bitcoinPrice > 0 && rawAmount > 0) {
+                val fiatAmount = rawAmount / 100.0 // cents to dollars/euros
+                (fiatAmount / bitcoinPrice * 100_000_000).toLong()
+            } else {
+                rawAmount
+            }
+        } else {
+            rawAmount // already in sats
+        }
 
         // Parse entry currency
         val parsedAmount = Amount.parse(formattedAmount)
@@ -165,10 +182,6 @@ class TipSelectionActivity : AppCompatActivity() {
         // Set default for custom input based on entry currency
         customInputIsBtc = (entryCurrency == Currency.BTC)
         customInputCurrency = entryCurrency
-
-        // Get Bitcoin price
-        bitcoinPriceWorker = BitcoinPriceWorker.getInstance(this)
-        bitcoinPrice = bitcoinPriceWorker?.getCurrentPrice() ?: 0.0
 
         // Get tip presets
         val tipsManager = TipsManager.getInstance(this)
