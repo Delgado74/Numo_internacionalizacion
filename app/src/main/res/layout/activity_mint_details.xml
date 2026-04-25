@@ -252,6 +252,20 @@
                         android:clickable="true"
                         android:focusable="true" />
 
+                    <TextView
+                        android:id="@+id/unit_eur_button"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:paddingHorizontal="16dp"
+                        android:paddingVertical="8dp"
+                        android:text="EUR"
+                        android:textSize="14sp"
+                        android:textColor="@color/color_text_tertiary"
+                        android:background="@drawable/bg_input_pill_outlined"
+                        android:clickable="true"
+                        android:focusable="true" />
+
                 </LinearLayout>
 
 

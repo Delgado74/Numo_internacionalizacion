@@ -97,6 +97,7 @@ class MintDetailsActivity : AppCompatActivity() {
     private lateinit var unitSelectorSection: LinearLayout
     private lateinit var unitSatButton: TextView
     private lateinit var unitUsdButton: TextView
+    private lateinit var unitEurButton: TextView
 
     // State
     private lateinit var mintManager: MintManager
@@ -197,6 +198,7 @@ class MintDetailsActivity : AppCompatActivity() {
         unitSelectorSection = findViewById(R.id.unit_selector_section)
         unitSatButton = findViewById(R.id.unit_sat_button)
         unitUsdButton = findViewById(R.id.unit_usd_button)
+        unitEurButton = findViewById(R.id.unit_eur_button)
     }
 
     private fun setupListeners() {
@@ -283,6 +285,10 @@ class MintDetailsActivity : AppCompatActivity() {
             unitUsdButton.setOnClickListener {
                 setActiveUnit("usd")
             }
+            
+            unitEurButton.setOnClickListener {
+                setActiveUnit("eur")
+            }
         } else {
             Log.d(TAG, "loadUnitSelector: hiding unit selector (units: $supportedUnits)")
             unitSelectorSection.visibility = View.GONE
@@ -324,6 +330,20 @@ class MintDetailsActivity : AppCompatActivity() {
             }
         } else {
             unitUsdButton.visibility = View.GONE
+        }
+
+        // Update EUR button (only if supported)
+        if (supportedUnits.contains("eur")) {
+            unitEurButton.visibility = View.VISIBLE
+            if (activeUnit == "eur") {
+                unitEurButton.setBackgroundResource(R.drawable.bg_input_pill)
+                unitEurButton.setTextColor(getColor(R.color.color_text_primary))
+            } else {
+                unitEurButton.setBackgroundResource(R.drawable.bg_input_pill_outlined)
+                unitEurButton.setTextColor(getColor(R.color.color_text_tertiary))
+            }
+        } else {
+            unitEurButton.visibility = View.GONE
         }
     }
 
