@@ -24,7 +24,17 @@ object MintLimitChecker {
     fun checkMintLimits(amount: Long, mintLimits: CashuWalletManager.MintLimits?): LimitCheckResult {
         return checkMintLimitsWithTip(amount, 0, mintLimits)
     }
-    
+
+    /**
+     * Check mint limits with active mint unit for stablesat support.
+     * @param activeUnit The active mint unit (sat, usd, eur)
+     * @param amount The payment amount in the active unit's minor units (sats for sat, cents for usd/eur)
+     * @param mintLimits The mint limits from the mint info
+     */
+    fun checkMintLimits(activeUnit: String, amount: Long, mintLimits: CashuWalletManager.MintLimits?): LimitCheckResult {
+        return checkMintLimitsWithTip(activeUnit, amount, 0, mintLimits)
+    }
+
     /**
      * Check if amount + tip is within mint limits.
      * @param amount The base payment amount in sats
@@ -32,8 +42,24 @@ object MintLimitChecker {
      * @param mintLimits The mint limits from the mint info
      */
     fun checkMintLimitsWithTip(amount: Long, tipAmount: Long, mintLimits: CashuWalletManager.MintLimits?): LimitCheckResult {
+        return checkMintLimitsWithTip("sat", amount, tipAmount, mintLimits)
+    }
+
+    /**
+     * Check if amount + tip is within mint limits with active mint unit.
+     * @param activeUnit The active mint unit (sat, usd, eur)
+     * @param amount The payment amount in the active unit's minor units
+     * @param tipAmount The tip amount in the active unit's minor units
+     * @param mintLimits The mint limits from the mint info
+     */
+    fun checkMintLimitsWithTip(
+        activeUnit: String,
+        amount: Long,
+        tipAmount: Long,
+        mintLimits: CashuWalletManager.MintLimits?
+    ): LimitCheckResult {
         val totalAmount = amount + tipAmount
-        
+
         if (mintLimits == null) {
             return LimitCheckResult(
                 isValid = false,
@@ -43,13 +69,14 @@ object MintLimitChecker {
             )
         }
 
+        val normalizedUnit = activeUnit.lowercase()
         val bolt11Method = mintLimits.mintMethods.find { method ->
             val methodStr = method.method
-            val unitStr = method.unit
+            val unitStr = method.unit?.lowercase() ?: ""
             val methodMatch = methodStr.equals("bolt11", ignoreCase = true) ||
                 methodStr.contains("Bolt11") || methodStr.contains("bolt11")
-            val unitMatch = unitStr.equals("sat", ignoreCase = true) ||
-                unitStr.equals("SAT", ignoreCase = true) || unitStr.contains("Sat")
+            val unitMatch = unitStr == normalizedUnit ||
+                (normalizedUnit == "sat" && (unitStr == "sat" || unitStr == "sat" || unitStr == "sats"))
             methodMatch && unitMatch
         }
 

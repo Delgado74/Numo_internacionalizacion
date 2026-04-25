@@ -231,15 +231,27 @@ class AmountDisplayManager(
                 requestedAmount = satsValue
             }
             
-            // Check mint limits for satoshis
-            val limitCheck = MintLimitChecker.checkMintLimits(satsValue, currentMintLimits)
+            // Check mint limits using active mint unit and original amount (cents for stablesat, sats for sat)
+            val checkAmount = if (isStablesatUnit()) originalAmount else satsValue
+            val limitCheck = MintLimitChecker.checkMintLimits(activeMintUnit, checkAmount, currentMintLimits)
             if (limitCheck.isValid) {
                 submitButton.text = context.getString(R.string.pos_charge_button)
                 submitButton.isEnabled = true
             } else {
+                // Format limit amounts in the appropriate unit
+                val minDisplay = if (isStablesatUnit() && limitCheck.minAmount != null) {
+                    Amount(limitCheck.minAmount, Amount.Currency.USD).toString()
+                } else {
+                    limitCheck.minAmount?.toString() ?: ""
+                }
+                val maxDisplay = if (isStablesatUnit() && limitCheck.maxAmount != null) {
+                    Amount(limitCheck.maxAmount, Amount.Currency.USD).toString()
+                } else {
+                    limitCheck.maxAmount?.toString() ?: ""
+                }
                 val buttonText = when (limitCheck.limitType) {
-                    MintLimitChecker.LimitType.MIN -> context.getString(R.string.pos_charge_button_min_limit, limitCheck.minAmount ?: 0)
-                    MintLimitChecker.LimitType.MAX -> context.getString(R.string.pos_charge_button_max_limit, limitCheck.maxAmount ?: 0)
+                    MintLimitChecker.LimitType.MIN -> context.getString(R.string.pos_charge_button_min_limit, minDisplay)
+                    MintLimitChecker.LimitType.MAX -> context.getString(R.string.pos_charge_button_max_limit, maxDisplay)
                     MintLimitChecker.LimitType.DISABLED -> context.getString(R.string.pos_charge_button_mint_disabled)
                     else -> context.getString(R.string.pos_charge_button)
                 }
