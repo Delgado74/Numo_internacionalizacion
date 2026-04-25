@@ -959,6 +959,8 @@ class TipSelectionActivity : AppCompatActivity() {
             putExtra(EXTRA_BASE_FORMATTED_AMOUNT, formattedAmount)
             // Pass through the active unit (for stablesat support)
             putExtra(PaymentRequestActivity.EXTRA_ACTIVE_UNIT, activeUnit)
+            // Flag: amount is already in sats, not cents
+            putExtra("amount_in_sats", true)
             checkoutBasketJson?.let {
                 putExtra(PaymentRequestActivity.EXTRA_CHECKOUT_BASKET_JSON, it)
             }

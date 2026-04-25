@@ -299,10 +299,14 @@ class PaymentRequestActivity : AppCompatActivity() {
         bitcoinPriceWorker = BitcoinPriceWorker.getInstance(this)
 
         // Get payment amount from intent
+        val amountInSats = intent.getBooleanExtra("amount_in_sats", false)
         paymentAmount = intent.getLongExtra(EXTRA_PAYMENT_AMOUNT, 0)
+        
+        // If amount is from TipSelectionActivity, it's already in sats
+        // No conversion needed
         val intentUnit = intent.getStringExtra(EXTRA_ACTIVE_UNIT)
         activeUnit = intentUnit ?: "sat"
-        Log.d(TAG, "onCreate: EXTRA_ACTIVE_UNIT from intent='$intentUnit', activeUnit='$activeUnit'")
+        Log.d(TAG, "onCreate: EXTRA_ACTIVE_UNIT from intent='$intentUnit', activeUnit='$activeUnit', amountInSats=$amountInSats")
 
         if (paymentAmount <= 0) {
             Log.e(TAG, "Invalid payment amount: $paymentAmount")
