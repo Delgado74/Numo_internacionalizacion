@@ -302,10 +302,21 @@ class PaymentRequestActivity : AppCompatActivity() {
         val amountInSats = intent.getBooleanExtra("amount_in_sats", false)
         paymentAmount = intent.getLongExtra(EXTRA_PAYMENT_AMOUNT, 0)
         
-        // If amount is from TipSelectionActivity, it's already in sats
-        // No conversion needed
+        // Store flag for conversion logic
         val intentUnit = intent.getStringExtra(EXTRA_ACTIVE_UNIT)
         activeUnit = intentUnit ?: "sat"
+        
+        // If amount came from TipSelectionActivity, it's already in sats - treat accordingly
+        // Otherwise (from POS), convert cents to sats for USD/EUR
+        if (!amountInSats && (activeUnit == "usd" || activeUnit == "eur")) {
+            val btcPrice = bitcoinPriceWorker?.getCurrentPrice() ?: 0.0
+            if (btcPrice > 0) {
+                val fiatAmount = paymentAmount / 100.0
+                paymentAmount = (fiatAmount / btcPrice * 100_000_000).toLong()
+                Log.d(TAG, "Converted cents to sats: $paymentAmount")
+            }
+        }
+        
         Log.d(TAG, "onCreate: EXTRA_ACTIVE_UNIT from intent='$intentUnit', activeUnit='$activeUnit', amountInSats=$amountInSats")
 
         if (paymentAmount <= 0) {
@@ -472,9 +483,8 @@ private fun updateConvertedAmount(formattedAmountString: String) {
             return
         }
 
-        val isStablesatUnit = activeUnit == "usd" || activeUnit == "eur"
-
-        if (isBtcAmount) {
+        // Payment is already in sats - show fiat conversion
+        if (paymentAmount > 0) {
             val fiatValue = bitcoinPriceWorker?.satoshisToFiat(paymentAmount) ?: 0.0
             if (fiatValue > 0) {
                 val formattedFiat = bitcoinPriceWorker?.formatFiatAmount(fiatValue)
@@ -485,24 +495,7 @@ private fun updateConvertedAmount(formattedAmountString: String) {
                 convertedAmountDisplay.visibility = View.GONE
             }
         } else {
-            if (paymentAmount > 0) {
-                val satsValue = if (isStablesatUnit) {
-                    val fiatAmount = paymentAmount / 100.0
-                    val btcPrice = bitcoinPriceWorker?.getCurrentPrice() ?: 0.0
-                    if (btcPrice > 0) {
-                        (fiatAmount / btcPrice * 100_000_000).toLong()
-                    } else {
-                        paymentAmount
-                    }
-                } else {
-                    paymentAmount
-                }
-                val formattedBtc = Amount(satsValue, Currency.BTC).toString()
-                convertedAmountDisplay.text = formattedBtc
-                convertedAmountDisplay.visibility = View.VISIBLE
-            } else {
-                convertedAmountDisplay.visibility = View.GONE
-            }
+            convertedAmountDisplay.visibility = View.GONE
         }
     }
 
