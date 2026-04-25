@@ -260,8 +260,9 @@ class MintProfileService private constructor(context: Context) {
                         val methods = nut04.getJSONArray("methods")
                         for (i in 0 until methods.length()) {
                             val m = methods.getJSONObject(i)
-                            if (m.has("unit")) {
-                                units.add(m.getString("unit"))
+                            val unit = m.optString("unit", "").trim().lowercase(Locale.ROOT)
+                            if (unit.isNotEmpty()) {
+                                units.add(unit)
                             }
                         }
                     }

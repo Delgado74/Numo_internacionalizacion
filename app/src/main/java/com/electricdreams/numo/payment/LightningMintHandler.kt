@@ -154,6 +154,7 @@ class LightningMintHandler(
                 currentCurrencyUnit = when (activeUnit.lowercase()) {
                     "usd" -> CurrencyUnit.Usd
                     "eur" -> CurrencyUnit.Eur
+                    "msat" -> CurrencyUnit.Msat
                     else -> CurrencyUnit.Sat
                 }
                 

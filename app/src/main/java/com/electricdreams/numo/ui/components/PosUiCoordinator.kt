@@ -185,8 +185,14 @@ class PosUiCoordinator(
                     Log.d("PosUiCoordinator", "Auto-initiating payment flow for basket checkout with amount: $paymentAmount")
                     showChargeButtonSpinner()
                     val formattedAmount = amountDisplay.text.toString()
+                    // Use originalAmount for stablesat (USD/EUR), requestedAmount for SAT
+                    val paymentAmountForRequest = if (activeUnit == "usd" || activeUnit == "eur") {
+                        amountDisplayManager.originalAmount
+                    } else {
+                        amountDisplayManager.requestedAmount
+                    }
                     paymentMethodHandler.showPaymentMethodDialog(
-                        amountDisplayManager.requestedAmount, 
+                        paymentAmountForRequest,
                         formattedAmount,
                         activeUnit
                     )
