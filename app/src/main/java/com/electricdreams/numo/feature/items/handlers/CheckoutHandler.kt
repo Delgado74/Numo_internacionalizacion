@@ -7,8 +7,10 @@ import com.electricdreams.numo.R
 import com.electricdreams.numo.PaymentRequestActivity
 import com.electricdreams.numo.core.model.Amount
 import com.electricdreams.numo.core.model.CheckoutBasket
+import com.electricdreams.numo.core.prefs.PreferenceStore
 import com.electricdreams.numo.core.util.BasketManager
 import com.electricdreams.numo.core.util.CurrencyManager
+import com.electricdreams.numo.core.util.MintManager
 import com.electricdreams.numo.core.worker.BitcoinPriceWorker
 import com.electricdreams.numo.feature.tips.TipSelectionActivity
 import com.electricdreams.numo.feature.tips.TipsManager
@@ -65,17 +67,33 @@ class CheckoutHandler(
         android.util.Log.d("CheckoutHandler", "Captured basket with ${checkoutBasket.items.size} items, total: $totalSatoshis sats")
         android.util.Log.d("CheckoutHandler", "Basket JSON size: ${checkoutBasketJson.length} chars")
 
-        // Clear basket before navigating away so UI state is clean when we return
+// Clear basket before navigating away so UI state is clean when we return
         basketManager.clearBasket()
+
+        // Read active unit from preferences for stablesat support
+        val prefs = PreferenceStore.app(activity)
+        val mintManager = MintManager.getInstance(activity)
+        val preferredMint = mintManager.getPreferredLightningMint() ?: "sat"
+        val activeUnit = prefs.getString("active_unit_for_mint_$preferredMint", "sat") ?: "sat"
+
+        // Calculate correct amount based on active unit
+        // For stablesat (USD/EUR): use fiat in cents
+        // For sat: use sats
+        val paymentAmount = if (activeUnit == "usd" || activeUnit == "eur") {
+            (fiatTotal * 100).toLong() // cents
+        } else {
+            totalSatoshis // sats
+        }
 
         // Decide whether to show tip selection first or go directly to payment request
         val tipsManager = TipsManager.getInstance(activity)
         if (tipsManager.tipsEnabled) {
             // Route through beautiful tip selection screen first
             val intent = Intent(activity, TipSelectionActivity::class.java).apply {
-                putExtra(TipSelectionActivity.EXTRA_PAYMENT_AMOUNT, totalSatoshis)
+                putExtra(TipSelectionActivity.EXTRA_PAYMENT_AMOUNT, paymentAmount)
                 putExtra(TipSelectionActivity.EXTRA_FORMATTED_AMOUNT, formattedAmount)
                 putExtra(TipSelectionActivity.EXTRA_CHECKOUT_BASKET_JSON, checkoutBasketJson)
+                putExtra(PaymentRequestActivity.EXTRA_ACTIVE_UNIT, activeUnit)
                 // Preserve saved basket association all the way through to PaymentRequestActivity
                 savedBasketId?.let { putExtra(PaymentRequestActivity.EXTRA_SAVED_BASKET_ID, it) }
             }
@@ -83,9 +101,10 @@ class CheckoutHandler(
         } else {
             // Go directly to payment request without tips
             val intent = Intent(activity, PaymentRequestActivity::class.java).apply {
-                putExtra(PaymentRequestActivity.EXTRA_PAYMENT_AMOUNT, totalSatoshis)
+                putExtra(PaymentRequestActivity.EXTRA_PAYMENT_AMOUNT, paymentAmount)
                 putExtra(PaymentRequestActivity.EXTRA_FORMATTED_AMOUNT, formattedAmount)
                 putExtra(PaymentRequestActivity.EXTRA_CHECKOUT_BASKET_JSON, checkoutBasketJson)
+                putExtra(PaymentRequestActivity.EXTRA_ACTIVE_UNIT, activeUnit)
                 savedBasketId?.let { putExtra(PaymentRequestActivity.EXTRA_SAVED_BASKET_ID, it) }
             }
             activity.startActivity(intent)
