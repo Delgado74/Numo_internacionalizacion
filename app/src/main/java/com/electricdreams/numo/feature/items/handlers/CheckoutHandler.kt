@@ -94,6 +94,8 @@ class CheckoutHandler(
                 putExtra(TipSelectionActivity.EXTRA_FORMATTED_AMOUNT, formattedAmount)
                 putExtra(TipSelectionActivity.EXTRA_CHECKOUT_BASKET_JSON, checkoutBasketJson)
                 putExtra(PaymentRequestActivity.EXTRA_ACTIVE_UNIT, activeUnit)
+                // Amount is in cents for USD/EUR, will be converted by TipSelectionActivity
+                putExtra("amount_in_sats", false)
                 // Preserve saved basket association all the way through to PaymentRequestActivity
                 savedBasketId?.let { putExtra(PaymentRequestActivity.EXTRA_SAVED_BASKET_ID, it) }
             }
@@ -105,6 +107,8 @@ class CheckoutHandler(
                 putExtra(PaymentRequestActivity.EXTRA_FORMATTED_AMOUNT, formattedAmount)
                 putExtra(PaymentRequestActivity.EXTRA_CHECKOUT_BASKET_JSON, checkoutBasketJson)
                 putExtra(PaymentRequestActivity.EXTRA_ACTIVE_UNIT, activeUnit)
+                // Flag: amount is already in correct units (cents for USD/EUR, sats for sat)
+                putExtra("amount_in_sats", activeUnit == "sat")
                 savedBasketId?.let { putExtra(PaymentRequestActivity.EXTRA_SAVED_BASKET_ID, it) }
             }
             activity.startActivity(intent)
