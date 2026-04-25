@@ -215,16 +215,16 @@ class MintProfileService private constructor(context: Context) {
             mintManager.setMintInfo(normalizedUrl, infoJson)
             Log.d(TAG, "setMintInfo called for $normalizedUrl, length=${infoJson.length}")
             mintManager.setMintRefreshTimestamp(normalizedUrl)
-        } else {
-            Log.d(TAG, "Skipped storing mint info in cache for $normalizedUrl (storeInCache=false)")
-        }
 
-        // Store supported units if detected (always store regardless of storeInCache)
-        if (supportedUnits != null && supportedUnits.isNotEmpty()) {
-            mintManager.setSupportedUnits(normalizedUrl, supportedUnits)
-            Log.d(TAG, "Stored supported units for $normalizedUrl: $supportedUnits")
+            // Store supported units only when caching
+            if (!supportedUnits.isNullOrEmpty()) {
+                mintManager.setSupportedUnits(normalizedUrl, supportedUnits)
+                Log.d(TAG, "Stored supported units for $normalizedUrl: $supportedUnits")
+            } else {
+                Log.d(TAG, "No supported units detected for $normalizedUrl, will use default")
+            }
         } else {
-            Log.d(TAG, "No supported units detected for $normalizedUrl, will use default")
+            Log.d(TAG, "Skipped storing mint info/units in cache for $normalizedUrl (storeInCache=false)")
         }
 
         var iconCached = false
