@@ -31,6 +31,7 @@ import com.electricdreams.numo.payment.PaymentMethodHandler
 import com.electricdreams.numo.payment.PaymentResultHandler
 import com.electricdreams.numo.payment.NfcPaymentProcessor
 import com.electricdreams.numo.ui.theme.ThemeManager
+import com.electricdreams.numo.ui.components.MintSelectionBottomSheet
 
 /**
  * Coordinates all UI managers and handles main POS interface logic.
@@ -360,6 +361,11 @@ private fun initializeViews() {
     }
 
     private fun setupNavigationButtons() {
+        // Mint info bar click listener to show mint selector
+        mintInfoContainer?.setOnClickListener {
+            showMintSelector()
+        }
+
         // Set up currency toggle
         val secondaryAmountContainer = activity.findViewById<View>(R.id.secondary_amount_container)
         secondaryAmountContainer.setOnClickListener { 
@@ -410,6 +416,36 @@ private fun initializeViews() {
             } else {
                 showAmountRequiredError()
             }
+        }
+    }
+
+    private fun showMintSelector() {
+        activity.lifecycleScope.launch {
+            val mintBalances = CashuWalletManager.getAllMintBalances()
+            if (mintBalances.isEmpty()) {
+                android.widget.Toast.makeText(
+                    activity,
+                    activity.getString(R.string.pos_error_no_mints_configured),
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
+                return@launch
+            }
+
+            val listener = object : MintSelectionBottomSheet.OnMintSelectedListener {
+                override fun onMintSelected(mintUrl: String, balance: Long) {
+                    mintManager.setPreferredLightningMint(mintUrl)
+                    updateMintIndicator()
+                    val displayName = mintManager.getMintDisplayName(mintUrl)
+                    android.widget.Toast.makeText(
+                        activity,
+                        activity.getString(R.string.mint_active_unit_toast, displayName),
+                        android.widget.Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
+
+            val bottomSheet = MintSelectionBottomSheet.newInstance(mintBalances, listener)
+            bottomSheet.show(activity.supportFragmentManager, "MintSelector")
         }
     }
 
