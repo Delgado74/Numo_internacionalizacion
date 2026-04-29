@@ -421,14 +421,22 @@ private fun initializeViews() {
 
     private fun showMintSelector() {
         activity.lifecycleScope.launch {
-            val mintBalances = CashuWalletManager.getAllMintBalances()
-            if (mintBalances.isEmpty()) {
+            // Get all configured mints from MintManager
+            val allowedMints = mintManager.getAllowedMints()
+            if (allowedMints.isEmpty()) {
                 android.widget.Toast.makeText(
                     activity,
                     activity.getString(R.string.pos_error_no_mints_configured),
                     android.widget.Toast.LENGTH_SHORT
                 ).show()
                 return@launch
+            }
+
+            // Get balances for all configured mints
+            val mintBalances = mutableMapOf<String, Long>()
+            for (mintUrl in allowedMints) {
+                val balance = CashuWalletManager.getBalanceForMint(mintUrl)
+                mintBalances[mintUrl] = balance
             }
 
             val listener = object : MintSelectionBottomSheet.OnMintSelectedListener {
