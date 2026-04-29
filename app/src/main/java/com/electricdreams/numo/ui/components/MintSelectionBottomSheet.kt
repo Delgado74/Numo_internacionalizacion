@@ -80,7 +80,8 @@ class MintSelectionBottomSheet : BottomSheetDialogFragment() {
         val recyclerView = view.findViewById<RecyclerView>(R.id.mints_recycler_view)
         recyclerView.layoutManager = LinearLayoutManager(requireContext())
         
-        val mintsWithBalance = mintBalances.filter { it.value > 0 }
+        // Show all configured mints, not just those with balance > 0
+        val mintsWithBalance = mintBalances
         recyclerView.adapter = MintAdapter(mintsWithBalance)
     }
 
