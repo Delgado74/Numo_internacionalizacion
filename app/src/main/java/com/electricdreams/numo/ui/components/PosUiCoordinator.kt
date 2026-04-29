@@ -449,6 +449,8 @@ private fun initializeViews() {
                         activity.getString(R.string.mint_active_unit_toast, displayName),
                         android.widget.Toast.LENGTH_SHORT
                     ).show()
+                    // Reload mint limits for the newly selected mint
+                    reloadMintLimits()
                 }
             }
 
